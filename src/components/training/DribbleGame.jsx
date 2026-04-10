@@ -1,76 +1,98 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 
-// ─── Configuração de bolas ───────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// CONSTANTES
+// ═══════════════════════════════════════════════════════════════════════════
+
 const BALL_TYPES = [
-  { id: 'head',   name: 'Cabeça de Boneca', emoji: '🧠', speed: 0.95, desc: 'Leve, imprevisível' },
-  { id: 'can',      name: 'Lata',         emoji: '🥫', speed: 0.8,  desc: 'Pesada e reta' },
-  { id: 'stone',  name: 'Pedra',        emoji: '🪨', speed: 0.6,  desc: 'Muito pesada' },
-  { id: 'paper',  name: 'Papel Amassado', emoji: '📄', speed: 1.1,  desc: 'Leve e flutuante' },
-  { id: 'bottle', name: 'Garrafinha',   emoji: '🍼', speed: 1.0,  desc: 'Equilibrada' },
-  { id: 'lemon',  name: 'Limão',        emoji: '🍋', speed: 1.0,  desc: 'Irregular' },
-  { id: 'cap',     name: 'Tampinha',   emoji: '🪙', speed: 1.05, desc: 'Muito leve' },
+  { id: 'head',   name: 'Cabeça de Boneca', emoji: '🧠', speed: 0.95, desc: 'Leve e imprevisível' },
+  { id: 'can',    name: 'Lata',         emoji: '🥫', speed: 0.80, desc: 'Pesada e reta' },
+  { id: 'stone',  name: 'Pedra',        emoji: '🪨', speed: 0.60, desc: 'Muito pesada' },
+  { id: 'paper',  name: 'Papel Amassado', emoji: '📄', speed: 1.10, desc: 'Leve e flutuante' },
+  { id: 'bottle', name: 'Garrafinha',   emoji: '🍼', speed: 1.00, desc: 'Equilibrada' },
+  { id: 'lemon',  name: 'Limão',        emoji: '🍋', speed: 1.00, desc: 'Irregular' },
+  { id: 'cap',    name: 'Tampinha',    emoji: '🪙', speed: 1.05, desc: 'Muito leve' },
 ];
 
-// ─── Configuração de obstáculos de rua ─────────────────────────────────────
 const OBSTACLE_TYPES = [
-  { id: 'dog',    name: 'Cachorrinho', emoji: '🐕', behavior: 'patrol', desc: 'Corre de um lado pro outro' },
-  { id: 'car',    name: 'Carro Estacionado', emoji: '🚗', behavior: 'static', desc: 'Bloqueia o caminho' },
-  { id: 'cat',    name: 'Gato',         emoji: '🐱', behavior: 'patrol', desc: 'Passa pelo meio' },
-  { id: 'bike',   name: 'Bicicleta',     emoji: '🚲', behavior: 'parked', desc: 'Estacionada no canto' },
-  { id: 'bin',     name: 'Lixeira',       emoji: '🗑️', behavior: 'static', desc: 'Obstáculo fixo' },
+  { id: 'dog',  name: 'Cachorrinho',      emoji: '🐕', behavior: 'patrol', desc: 'Corre de um lado pro outro' },
+  { id: 'car',  name: 'Carro Estacionado', emoji: '🚗', behavior: 'static', desc: 'Bloqueia o caminho' },
+  { id: 'cat',  name: 'Gato',            emoji: '🐱', behavior: 'patrol', desc: 'Passeia pelo local' },
+  { id: 'bike', name: 'Bicicleta',       emoji: '🚲', behavior: 'parked', desc: 'Estacionada no canto' },
+  { id: 'bin',  name: 'Lixeira',         emoji: '🗑️', behavior: 'static', desc: 'Obstáculo fixo' },
 ];
 
-// ─── Configuração de níveis ───────────────────────────────────────────────
 const LEVELS = [
-  { label: 'Nível 1', time: 60, goals: 3, obstacles: 1, botSpeed: 0.7, desc: 'Futebol de rua calmo' },
+  { label: 'Nível 1', time: 60, goals: 3, obstacles: 1, botSpeed: 0.7, desc: 'Rua calma, poucos obstáculos' },
   { label: 'Nível 2', time: 55, goals: 4, obstacles: 2, botSpeed: 0.9, desc: 'Cuidado com os cachorros!' },
   { label: 'Nível 3', time: 50, goals: 5, obstacles: 3, botSpeed: 1.1, desc: 'Mais obstáculos na rua!' },
   { label: 'Nível 4', time: 45, goals: 5, obstacles: 3, botSpeed: 1.3, desc: 'Velocidade aumentando!' },
-  { label: '5', time: 40, goals: 6, obstacles: 4, botSpeed: 1.6, desc: 'Fim de semana na rua!' },
+  { label: 'Nível 5', time: 40, goals: 6, obstacles: 4, botSpeed: 1.6, desc: 'Fim de semana na rua!' },
 ];
 
-// Dimensões do campo
 const FIELD_W = 320;
 const FIELD_H = 480;
 const GOAL_WIDTH = 60;
 const GOAL_HEIGHT = 50;
 const PLAYER_SIZE = 18;
-const BALL_SIZE = 12;
 const OBSTACLE_SIZE = 20;
 
-function distance(a, b) { return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2); }
+// ═══════════════════════════════════════════════════════════════════════════
+// FUNÇÕES AUXILIARES
+// ═══════════════════════════════════════════════════════════════════════════
+
+function distance(a, b) {
+  return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COMPONENTE PRINCIPAL
+// ═══════════════════════════════════════════════════════════════════════════
 
 export default function DribbleGame({ onStickerEarned }) {
+  // Estados
   const [phase, setPhase] = useState('menu');
   const [level, setLevel] = useState(0);
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(3);
   const [goals, setGoals] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(60);
 
   // Seleção
   const [selectedBall, setSelectedBall] = useState(BALL_TYPES[0]);
   const [selectedObstacles, setSelectedObstacles] = useState([]);
+
+  // Posições
   const [playerPos, setPlayerPos] = useState({ x: FIELD_W / 2, y: FIELD_H - 50 });
   const [botPos, setBotPos] = useState({ x: FIELD_W / 2, y: 50 });
   const [obstaclePositions, setObstaclePositions] = useState([]);
+
+  // Controle
   const [velocity, setVelocity] = useState({ x: 0, y: 0 });
   const [gameOver, setGameOver] = useState(false);
-  const playerStart = useRef({ x: FIELD_W / 2, y: FIELD_H - 50 });
+
+  // Refs
   const velocityRef = useRef({ x: 0, y: 0 });
   const loopRef = useRef(null);
+  const playerStartRef = useRef({ x: FIELD_W / 2, y: FIELD_H - 50 });
+
   const config = LEVELS[level] || LEVELS[0];
 
-  // ─── Gerar obstáculos ─────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GERAÇÃO DE OBSTÁCULOS
+  // ═══════════════════════════════════════════════════════════════════════════
+
   const generateObstacles = useCallback(() => {
     const newObstacles = [];
     const count = config.obstacles + 1;
+    
     for (let i = 0; i < count; i++) {
       const type = OBSTACLE_TYPES[i % OBSTACLE_TYPES.length];
       const isTop = i < 2;
       const x = 30 + Math.random() * (FIELD_W - 60);
       const y = isTop ? 50 + Math.random() * 100 : 280 + Math.random() * (FIELD_H - 280);
+      
       newObstacles.push({
         id: i,
         type,
@@ -80,27 +102,34 @@ export default function DribbleGame({ onStickerEarned }) {
         speed: 0.5 + Math.random() * 0.5
       });
     }
+    
     setObstaclePositions(newObstacles);
   }, [config.obstacles]);
 
-  // ─── Iniciar jogo ────────────────────────────────────────────────────────
-  const startGame = () => {
+  // ═══════════════════════════════════════════════════════════════════════════
+  // INICIALIZAÇÃO DO JOGO
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const startGame = useCallback(() => {
     setPhase('playing');
     setLevel(0);
     setScore(0);
     setLives(3);
     setGoals(0);
-    setTimeLeft(config.time);
+    setTimeLeft(LEVELS[0].time);
     setPlayerPos({ x: FIELD_W / 2, y: FIELD_H - 50 });
     setBotPos({ x: FIELD_W / 2, y: 50 });
-    playerStart.current = { x: FIELD_W / 2, y: FIELD_H - 50 };
+    playerStartRef.current = { x: FIELD_W / 2, y: FIELD_H - 50 };
     velocityRef.current = { x: 0, y: 0 };
     setVelocity({ x: 0, y: 0 });
     generateObstacles();
     setGameOver(false);
-  };
+  }, [generateObstacles]);
 
-  // ─── Game loop ────────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GAME LOOP
+  // ═══════════════════════════════════════════════════════════════════════════
+
   useEffect(() => {
     if (phase !== 'playing') {
       if (loopRef.current) cancelAnimationFrame(loopRef.current);
@@ -131,7 +160,7 @@ export default function DribbleGame({ onStickerEarned }) {
         };
       });
 
-      // Atualizar obstáculos com movimento
+      // Atualizar obstáculos móveis
       setObstaclePositions(prev => prev.map(obs => {
         if (obs.type.behavior === 'patrol') {
           let newX = obs.x + obs.dir * obs.speed;
@@ -143,63 +172,6 @@ export default function DribbleGame({ onStickerEarned }) {
         return obs;
       }));
 
-      // Verificar colisão com o bot
-      const dist = distance(playerPos, botPos);
-      if (dist < PLAYER_SIZE + PLAYER_SIZE) {
-        const newLives = lives - 1;
-        setLives(newLives);
-        if (newLives <= 0) {
-          setGameOver(true);
-          setPhase('result');
-        } else {
-          // Respawn
-          setPlayerPos(playerStart.current);
-          setBotPos({ x: FIELD_W / 2, y: 50 });
-        }
-        return;
-      }
-
-      // Verificar colisão com obstáculos
-      obstaclePositions.forEach(obs => {
-        const d = distance(playerPos, { x: obs.x, y: obs.y });
-        if (d < PLAYER_SIZE + OBSTACLE_SIZE) {
-          // Empurrar jogador
-          const angle = Math.atan2(playerPos.y - obs.y, playerPos.x - obs.x);
-          setPlayerPos(prev => ({
-            x: Math.max(PLAYER_SIZE, Math.min(FIELD_W - PLAYER_SIZE, prev.x + Math.cos(angle) * 3)),
-            y: Math.max(PLAYER_SIZE, Math.min(FIELD_H - PLAYER_SIZE, prev.y + Math.sin(angle) * 3))
-          }));
-        }
-      });
-
-      // Verificar gol (chegou no gol do adversário - topo)
-      const inGoalX = Math.abs(playerPos.x - FIELD_W / 2) < GOAL_WIDTH / 2;
-      const inGoalY = playerPos.y < GOAL_HEIGHT + PLAYER_SIZE;
-      if (inGoalX && inGoalY) {
-        const newGoals = goals + 1;
-        const newScore = score + (level + 1) * 10;
-        setGoals(newGoals);
-        setScore(newScore);
-
-        if (newGoals >= config.goals) {
-          // Avançar de nível
-          if (level < LEVELS.length - 1) {
-            setLevel(l => l + 1);
-            setGoals(0);
-            generateObstacles();
-            setPlayerPos(playerStart.current);
-            setBotPos({ x: FIELD_W / 2, y: 50 });
-          } else {
-            // Vitória!
-            setPhase('result');
-          }
-        } else {
-          // Continuar
-          setPlayerPos(playerStart.current);
-          setBotPos({ x: FIELD_W / 2, y: 50 });
-        }
-      }
-
       loopRef.current = requestAnimationFrame(gameLoop);
     };
 
@@ -207,9 +179,69 @@ export default function DribbleGame({ onStickerEarned }) {
     return () => {
       if (loopRef.current) cancelAnimationFrame(loopRef.current);
     };
-  }, [phase, playerPos, botPos, obstaclePositions, lives, level, goals, config, selectedBall, score]);
+  }, [phase, playerPos, botPos, config, selectedBall]);
 
-  // ─── Timer ────────────────────────────────────────────────────────────────
+  // Verificar colisões e gols
+  useEffect(() => {
+    if (phase !== 'playing') return;
+
+    // Colisão com o bot
+    const dist = distance(playerPos, botPos);
+    if (dist < PLAYER_SIZE + PLAYER_SIZE) {
+      const newLives = lives - 1;
+      setLives(newLives);
+      if (newLives <= 0) {
+        setGameOver(true);
+        setPhase('result');
+      } else {
+        setPlayerPos(playerStartRef.current);
+        setBotPos({ x: FIELD_W / 2, y: 50 });
+      }
+      return;
+    }
+
+    // Colisão com obstáculos
+    obstaclePositions.forEach(obs => {
+      const d = distance(playerPos, { x: obs.x, y: obs.y });
+      if (d < PLAYER_SIZE + OBSTACLE_SIZE) {
+        const angle = Math.atan2(playerPos.y - obs.y, playerPos.x - obs.x);
+        setPlayerPos(prev => ({
+          x: Math.max(PLAYER_SIZE, Math.min(FIELD_W - PLAYER_SIZE, prev.x + Math.cos(angle) * 3)),
+          y: Math.max(PLAYER_SIZE, Math.min(FIELD_H - PLAYER_SIZE, prev.y + Math.sin(angle) * 3))
+        }));
+      }
+    });
+
+    // Verificar gol
+    const inGoalX = Math.abs(playerPos.x - FIELD_W / 2) < GOAL_WIDTH / 2;
+    const inGoalY = playerPos.y < GOAL_HEIGHT + PLAYER_SIZE;
+    if (inGoalX && inGoalY) {
+      const newGoals = goals + 1;
+      const newScore = score + (level + 1) * 10;
+      setGoals(newGoals);
+      setScore(newScore);
+
+      if (newGoals >= config.goals) {
+        if (level < LEVELS.length - 1) {
+          setLevel(l => l + 1);
+          setGoals(0);
+          generateObstacles();
+          setPlayerPos(playerStartRef.current);
+          setBotPos({ x: FIELD_W / 2, y: 50 });
+        } else {
+          setPhase('result');
+        }
+      } else {
+        setPlayerPos(playerStartRef.current);
+        setBotPos({ x: FIELD_W / 2, y: 50 });
+      }
+    }
+  }, [phase, playerPos, botPos, obstaclePositions, lives, level, goals, config, score, generateObstacles]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // TIMER
+  // ═══════════════════════════════════════════════════════════════════════════
+
   useEffect(() => {
     if (phase !== 'playing') return;
     const timer = setInterval(() => {
@@ -224,7 +256,10 @@ export default function DribbleGame({ onStickerEarned }) {
     return () => clearInterval(timer);
   }, [phase]);
 
-  // ─--- Controles de teclado ─────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CONTROLES DE TECLADO
+  // ═══════════════════════════════════════════════════════════════════════════
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       const speed = 1;
@@ -259,7 +294,10 @@ export default function DribbleGame({ onStickerEarned }) {
     };
   }, []);
 
-  // ─--- Controles touch para mobile ─────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CONTROLES TOUCH
+  // ═══════════════════════════════════════════════════════════════════════════
+
   const handleTouchMove = (e) => {
     if (phase !== 'playing') return;
     const touch = e.touches[0];
@@ -282,7 +320,10 @@ export default function DribbleGame({ onStickerEarned }) {
     setVelocity({ x: 0, y: 0 });
   };
 
-  // ─── Handlers de seleção ────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HANDLERS DE SELEÇÃO
+  // ═══════════════════════════════════════════════════════════════════════════
+
   const handleSelectBall = (ball) => {
     setSelectedBall(ball);
     setPhase('obstacle-select');
@@ -297,9 +338,10 @@ export default function DribbleGame({ onStickerEarned }) {
     });
   };
 
-  // ─── Renderização ─────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  // RENDERIZAÇÃO - MENU
+  // ═══════════════════════════════════════════════════════════════════════════
 
-  // Menu principal
   if (phase === 'menu') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[80vh] gap-4 px-4">
@@ -328,7 +370,10 @@ export default function DribbleGame({ onStickerEarned }) {
     );
   }
 
-  // Seleção de bola
+  // ═══════════════════════════════════════════════════════════════════════════
+  // RENDERIZAÇÃO - SELEÇÃO DE BOLA
+  // ═══════════════════════════════════════════════════════════════════════════
+
   if (phase === 'ball-select') {
     return (
       <div className="flex flex-col items-center gap-4 px-4 py-6">
@@ -364,7 +409,10 @@ export default function DribbleGame({ onStickerEarned }) {
     );
   }
 
-  // Seleção de obstáculos
+  // ═══════════════════════════════════════════════════════════════════════════
+  // RENDERIZAÇÃO - SELEÇÃO DE OBSTÁCULOS
+  // ═══════════════════════════════════════════════════════════════════════════
+
   if (phase === 'obstacle-select') {
     return (
       <div className="flex flex-col items-center gap-4 px-4 py-6">
@@ -403,7 +451,10 @@ export default function DribbleGame({ onStickerEarned }) {
     );
   }
 
-  // Tela de jogo
+  // ═══════════════════════════════════════════════════════════════════════════
+  // RENDERIZAÇÃO - JOGO
+  // ═══════════════════════════════════════════════════════════════════════════
+
   if (phase === 'playing') {
     return (
       <div className="flex flex-col gap-3 p-2">
@@ -424,7 +475,7 @@ export default function DribbleGame({ onStickerEarned }) {
           </div>
         </div>
 
-        {/* Campo de futebol de rua */}
+        {/* Campo */}
         <div
           className="relative w-full aspect-[3/4] max-h-[320px] overflow-hidden rounded-xl"
           style={{
@@ -442,7 +493,7 @@ export default function DribbleGame({ onStickerEarned }) {
 
           {/* Gol do jogador (baixo) */}
           <div
-            className="absolute bottom-0 left-1/2 transform -translate-x-[-50%]"
+            className="absolute bottom-0 left-1/2 transform -translate-x-1/2"
             style={{
               width: GOAL_WIDTH,
               height: GOAL_HEIGHT,
@@ -452,12 +503,12 @@ export default function DribbleGame({ onStickerEarned }) {
               borderTopRightRadius: 4,
             }}
           >
-            <span className="absolute top-1 left-1/2 transform -translate-x-[-50%] text-lg">🥅</span>
+            <span className="absolute top-1 left-1/2 transform -translate-x-1/2 text-lg">🥅</span>
           </div>
 
           {/* Gol do adversário (topo) */}
           <div
-            className="absolute top-0 left-1/2 transform -translate-x-[-50%]"
+            className="absolute top-0 left-1/2 transform -translate-x-1/2"
             style={{
               width: GOAL_WIDTH,
               height: GOAL_HEIGHT,
@@ -467,7 +518,7 @@ export default function DribbleGame({ onStickerEarned }) {
               borderBottomRightRadius: 4,
             }}
           >
-            <span className="absolute bottom-1 left-1/2 transform -translate-x-[-50%] text-lg">⚽</span>
+            <span className="absolute bottom-1 left-1/2 transform -translate-x-1/2 text-lg">⚽</span>
           </div>
 
           {/* Obstáculos */}
@@ -539,8 +590,17 @@ export default function DribbleGame({ onStickerEarned }) {
           </div>
         </div>
 
-        {/* Controles Mobile */}
+        {/* D-pad Mobile */}
         <div className="grid grid-cols-3 gap-1 w-full max-w-xs mx-auto">
+          <div></div>
+          <button
+            onTouchStart={() => { velocityRef.current = { x: 0, y: -1 }; setVelocity({ x: 0, y: -1 }); }}
+            onTouchEnd={() => { velocityRef.current = { x: 0, y: 0 }; setVelocity({ x: 0, y: 0 }); }}
+            className="p-2 rounded-lg bg-amber-100 text-xl"
+          >
+            ⬆️
+          </button>
+          <div></div>
           <button
             onTouchStart={() => { velocityRef.current = { x: -1, y: 0 }; setVelocity({ x: -1, y: 0 }); }}
             onTouchEnd={() => { velocityRef.current = { x: 0, y: 0 }; setVelocity({ x: 0, y: 0 }); }}
@@ -548,29 +608,25 @@ export default function DribbleGame({ onStickerEarned }) {
           >
             ⬅️
           </button>
-          <div className="flex flex-col gap-1">
-            <button
-              onTouchStart={() => { velocityRef.current = { x: 0, y: -1 }; setVelocity({ x: 0, y: -1 }); }}
-              onTouchEnd={() => { velocityRef.current = { x: 0, y: 0 }; setVelocity({ x: 0, y: 0 }); }}
-              className="p-2 rounded-lg bg-amber-100 text-xl"
-            >
-              ⬆️
-            </button>
-            <button
-              onTouchStart={() => { velocityRef.current = { x: 0, y: 1 }; setVelocity({ x: 0, y: 1 }); }}
-              onTouchEnd={() => { velocityRef.current = { x: 0, y: 0 }; setVelocity({ x: 0, y: 0 }); }}
-              className="p-2 rounded-lg bg-amber-100 text-xl"
-            >
-              ⬇️
-            </button>
+          <div className="p-2 rounded-lg bg-amber-50 flex items-center justify-center">
+            <div className="w-3 h-3 bg-amber-300 rounded-full" />
           </div>
           <button
             onTouchStart={() => { velocityRef.current = { x: 1, y: 0 }; setVelocity({ x: 1, y: 0 }); }}
             onTouchEnd={() => { velocityRef.current = { x: 0, y: 0 }; setVelocity({ x: 0, y: 0 }); }}
-            className="p5 rounded-lg bg-amber-100 text-xl"
+            className="p-2 rounded-lg bg-amber-100 text-xl"
           >
             ➡️
           </button>
+          <div></div>
+          <button
+            onTouchStart={() => { velocityRef.current = { x: 0, y: 1 }; setVelocity({ x: 0, y: 1 }); }}
+            onTouchEnd={() => { velocityRef.current = { x: 0, y: 0 }; setVelocity({ x: 0, y: 0 }); }}
+            className="p-2 rounded-lg bg-amber-100 text-xl"
+          >
+            ⬇️
+          </button>
+          <div></div>
         </div>
 
         <p className="text-xs text-gray-400 text-center">{config.desc}</p>
@@ -578,7 +634,10 @@ export default function DribbleGame({ onStickerEarned }) {
     );
   }
 
-  // Tela de Resultado
+  // ═══════════════════════════════════════════════════════════════════════════
+  // RENDERIZAÇÃO - RESULTADO
+  // ═══════════════════════════════════════════════════════════════════════════
+
   if (phase === 'result') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[80vh] gap-4 px-4">
@@ -630,4 +689,6 @@ export default function DribbleGame({ onStickerEarned }) {
       </div>
     );
   }
+
+  return null;
 }

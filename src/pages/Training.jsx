@@ -26,7 +26,7 @@ import DiarioMenstrual from '@/components/training/DiarioMenstrual';
 const TRAINING_MODULES = [
   { id: 'penalty',       label: 'Penalti',             emoji: '⚽',  desc: 'Chute nos 9 quadrantes - engane a goleira!',   color: 'from-primary to-green-500',     component: PenaltyGame },
   { id: 'pass',          label: 'Passe',                emoji: '🎯',  desc: 'Reação e timing perfeito',                      color: 'from-blue-500 to-blue-600',      component: PassGame },
-  { id: 'dribble',       label: 'Zig Zague',            emoji: '⚡',  desc: 'Zigue-zague pelos cones - bata a adversaria!',  color: 'from-yellow-500 to-orange-500',  component: DribbleGame },
+  { id: 'dribble',       label: 'Fut de Rua',           emoji: '🥫',  desc: '1x1 na rua - escolha sua bola e desvie!',     color: 'from-amber-500 to-orange-600',   component: DribbleGame },
   { id: 'control',       label: 'Condução',             emoji: '🏃‍♀️', desc: 'Desvie das defensoras e avance!',               color: 'from-teal-500 to-cyan-500',      component: BallControlGame },
   { id: 'pursuit',       label: 'Drible c/ Marcador',   emoji: '🔥',  desc: 'Fuja da marcadora e chegue ao gol!',            color: 'from-accent to-pink-500',        component: PursuitGame },
   { id: 'conduct',       label: 'Leva pro Gol',         emoji: '🎯',  desc: 'Quadra 5x5 — desvie dos obstáculos e marque!', color: 'from-emerald-500 to-teal-600',   component: ConductGame },
