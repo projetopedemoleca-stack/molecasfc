@@ -7,6 +7,23 @@ import {
   redeemPromoCode, markAllAsSeen, drawSticker, addSticker
 } from '@/lib/albumSystem.js';
 import { ALL_STICKERS, RARITY, CATEGORIES, ALBUM_PAGES } from '@/lib/stickersData.js';
+import { PlayerAvatar, FlagBadge } from '@/components/ui/PlayerAvatar.jsx';
+
+// ── Helper: decide que visual usar no card ────────────────────────────────────
+function StickerVisual({ sticker, size = 52, blur = false }) {
+  const wrap = { display: 'flex', alignItems: 'center', justifyContent: 'center', height: size + 10 };
+  if (blur) {
+    return <div style={wrap}><span style={{ fontSize: size * 0.65, filter: 'blur(4px)', opacity: 0.4 }}>❓</span></div>;
+  }
+  if (sticker.category === 'national') {
+    return <div style={wrap}><FlagBadge country={sticker.country} size={size} /></div>;
+  }
+  if (sticker.category === 'brazil' || sticker.category === 'world') {
+    return <div style={wrap}><PlayerAvatar sticker={sticker} size={size} /></div>;
+  }
+  // icons / skills — mantém emoji
+  return <div style={wrap}><span style={{ fontSize: size * 0.7 }}>{sticker.emoji}</span></div>;
+}
 
 // ── Cor por raridade ──────────────────────────────────────────────────────────
 const rarityStyle = {
@@ -68,9 +85,9 @@ function StickerCard({ sticker, userSticker, onPaste, onTrade, selected, onSelec
         </span>
       )}
 
-      {/* Emoji / silhueta */}
-      <div className={`text-3xl my-1 ${!owned ? 'grayscale blur-sm' : pasted ? '' : 'drop-shadow-md'}`}>
-        {owned ? sticker.emoji : '❓'}
+      {/* Avatar / Bandeira / Emoji */}
+      <div className={`my-0.5 ${pasted ? 'opacity-80' : ''}`}>
+        <StickerVisual sticker={sticker} size={44} blur={!owned} />
       </div>
 
       {/* Nome */}
@@ -135,11 +152,11 @@ function PasteAnimation({ sticker, onDone }) {
         onAnimationComplete={() => setTimeout(onDone, 1200)}
       >
         <motion.div
-          className="text-7xl mb-2"
+          className="flex items-center justify-center mb-2"
           animate={{ rotate: [0, -10, 10, -5, 0] }}
           transition={{ delay: 0.5, duration: 0.5 }}
         >
-          {sticker.emoji}
+          <StickerVisual sticker={sticker} size={72} />
         </motion.div>
 
         <p className={`font-bold text-lg ${style.text}`}>{sticker.name}</p>
@@ -246,7 +263,9 @@ function StickerDetailModal({ sticker, userSticker, onClose, onPaste, onGenerate
         </span>
 
         {/* Emoji */}
-        <div className="text-7xl my-2">{sticker.emoji}</div>
+        <div className="my-2 flex items-center justify-center">
+          <StickerVisual sticker={sticker} size={76} />
+        </div>
 
         {/* Nome e info */}
         <h3 className={`font-heading font-black text-xl ${style.text}`}>{sticker.name}</h3>
