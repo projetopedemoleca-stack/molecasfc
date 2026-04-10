@@ -1436,7 +1436,7 @@ export default function Match() {
           </motion.div>
         )}
       </AnimatePresence>
-      {StickerToast}
+      <StickerToast />
     </div>
   );
 }

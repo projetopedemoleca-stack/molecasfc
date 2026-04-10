@@ -426,7 +426,7 @@ export default function PursuitGame() {
         style={{ background: 'linear-gradient(135deg,#7c3aed,#db2777)' }}>
         ▶ Começar!
       </motion.button>
-      {StickerToast}
+      <StickerToast />
     </div>
   );
 
@@ -598,7 +598,7 @@ export default function PursuitGame() {
         </div>
       )}
 
-      {StickerToast}
+      <StickerToast />
     </div>
   );
 }

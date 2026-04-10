@@ -92,17 +92,19 @@ export function useStickerToast() {
     setPending(result);
   }, []);
 
-  const StickerToast = (
-    <AnimatePresence>
-      {pending && (
-        <StickerEarnedToast
-          key={pending.uniqueId || pending.id || Math.random()}
-          sticker={pending}
-          onDone={() => setPending(null)}
-        />
-      )}
-    </AnimatePresence>
-  );
+  function StickerToast() {
+    return (
+      <AnimatePresence>
+        {pending && (
+          <StickerEarnedToast
+            key={pending.uniqueId || pending.id || String(Math.random())}
+            sticker={pending}
+            onDone={() => setPending(null)}
+          />
+        )}
+      </AnimatePresence>
+    );
+  }
 
   return { showToast, StickerToast };
 }

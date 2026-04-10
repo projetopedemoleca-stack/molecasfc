@@ -386,7 +386,7 @@ export default function EnglishGame() {
 
   // === MENU ===
   if (view === 'menu') return (
-    <>{StickerToast}
+    <><StickerToast />
       <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="text-center">
         <span className="text-5xl block mb-2">🇺🇸</span>
         <h2 className="font-heading font-bold text-3xl">Inglês do Futebol</h2>
@@ -420,7 +420,7 @@ export default function EnglishGame() {
   if (view === 'lesson') {
     const words = level.words.slice(wordPage * WORDS_PER_PAGE, (wordPage + 1) * WORDS_PER_PAGE);
     return (
-      <>{StickerToast}<div className="space-y-4">
+      <><StickerToast /><div className="space-y-4">
         <div className="flex items-center gap-3">
           <button onClick={() => setView('menu')} className="text-muted-foreground hover:text-foreground">
             <ArrowLeft className="w-5 h-5" />
@@ -669,5 +669,5 @@ export default function EnglishGame() {
     );
   }
 
-  return <>{StickerToast}</>;
+  return <><StickerToast /></>;
 }

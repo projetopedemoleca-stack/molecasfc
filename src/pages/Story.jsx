@@ -423,7 +423,7 @@ export default function Story() {
           </motion.div>
         )}
       </AnimatePresence>
-      {StickerToast}
+      <StickerToast />
     </div>
   );
 }

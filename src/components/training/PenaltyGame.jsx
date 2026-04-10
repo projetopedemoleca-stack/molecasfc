@@ -328,7 +328,7 @@ export default function PenaltyGame() {
           </button>
         </motion.div>
       )}
+      <StickerToast />
     </div>
-    {StickerToast}
   );
 }
