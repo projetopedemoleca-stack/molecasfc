@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Trophy, BookOpen, User, Star, ChevronDown, Sparkles, Gift } from 'lucide-react';
+import { Play, Trophy, BookOpen, User, Star, Sparkles, Gift } from 'lucide-react';
 import PlayerAvatar from '@/components/game/PlayerAvatar';
-import AlbumView from '@/components/training/AlbumView';
 import { PLAYERS } from '@/lib/gameData';
 import { loadProfile } from '@/lib/playerProfile';
 import { useStickerAlbum } from '@/hooks/useStickerAlbum.js';
@@ -121,7 +120,6 @@ function TestStickerButton({ onEarn }) {
 }
 
 export default function Home() {
-  const [showAlbum, setShowAlbum] = useState(false);
   const profile = loadProfile();
   const selectedPlayer = PLAYERS.find(p => p.id === (profile.selectedPlayerId || 'luna')) || PLAYERS[0];
   const uniformColor = profile.uniformColor || '#E91E63';
@@ -189,120 +187,96 @@ export default function Home() {
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-sm mb-3"
         >
-          <button
-            onClick={() => setShowAlbum(true)}
-            className="w-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 
-                       rounded-2xl p-3 text-white shadow-lg flex items-center gap-3"
-          >
-            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center text-2xl">
-              💎
-            </div>
-            <div className="flex-1 text-left">
-              <div className="flex items-center gap-2">
-                <span className="font-bold">Álbum de Figurinhas</span>
-                {newStickersCount > 0 && (
-                  <span className="bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-0.5 rounded-full">
-                    {newStickersCount} nova{newStickersCount > 1 ? 's' : ''}!
-                  </span>
-                )}
+          <Link to="/sticker-album">
+            <div className="w-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 
+                       rounded-2xl p-3 text-white shadow-lg flex items-center gap-3 cursor-pointer">
+              <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center text-2xl">
+                💎
               </div>
-              <div className="flex items-center gap-2 mt-1">
-                <div className="flex-1 h-2 bg-black/20 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-yellow-300 rounded-full transition-all"
-                    style={{ width: `${progress.percentage}%` }}
-                  />
+              <div className="flex-1 text-left">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold">Álbum de Figurinhas</span>
+                  {newStickersCount > 0 && (
+                    <span className="bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-0.5 rounded-full">
+                      {newStickersCount} nova{newStickersCount > 1 ? 's' : ''}!
+                    </span>
+                  )}
                 </div>
-                <span className="text-sm font-bold">{progress.percentage}%</span>
+                <div className="flex items-center gap-2 mt-1">
+                  <div className="flex-1 h-2 bg-black/20 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-yellow-300 rounded-full transition-all"
+                      style={{ width: `${progress.percentage}%` }}
+                    />
+                  </div>
+                  <span className="text-sm font-bold">{progress.percentage}%</span>
+                </div>
               </div>
+              <span className="text-xl">›</span>
             </div>
-            <span className="text-xl">›</span>
-          </button>
+          </Link>
         </motion.div>
       )}
 
       {/* Menu cards / Album view */}
       <div className="w-full max-w-sm space-y-3">
-        {!showAlbum ? (
-          <>
-            {menuItems.map((item, i) => (
-              <motion.div
-                key={item.to || item.id}
-                initial={{ x: -60, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                transition={{ delay: 0.3 + i * 0.1 }}
-              >
-                {item.isAlbum ? (
-                  <button
-                    onClick={() => setShowAlbum(true)}
-                    className="w-full"
-                  >
-                    <div className="bg-card rounded-2xl shadow-lg border border-border/30 flex items-center gap-4 overflow-hidden active:scale-95 transition-transform relative">
-                      <div className={`bg-gradient-to-b ${item.color} w-16 h-16 flex-shrink-0 flex items-center justify-center text-3xl`}>
-                        {item.emoji}
-                      </div>
-                      <div className="flex-1 py-3 pr-3 text-left">
-                        <div className="flex items-center gap-2">
-                          <p className="font-heading font-bold text-base text-foreground leading-tight">{item.label}</p>
-                          {newStickersCount > 0 && (
-                            <span className="bg-pink-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                              {newStickersCount}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-muted-foreground text-xs mt-0.5">{item.desc}</p>
-                        {progress.obtained > 0 && (
-                          <p className="text-xs text-pink-500 font-semibold mt-0.5">
-                            {progress.obtained}/{progress.total} figurinhas
-                          </p>
-                        )}
-                      </div>
-                      <span className="pr-4 text-muted-foreground text-xl">›</span>
-                    </div>
-                  </button>
-                ) : (
-                  <Link to={item.to}>
-                    <div className="bg-card rounded-2xl shadow-lg border border-border/30 flex items-center gap-4 overflow-hidden active:scale-95 transition-transform">
-                      <div className={`bg-gradient-to-b ${item.color} w-16 h-16 flex-shrink-0 flex items-center justify-center text-3xl`}>
-                        {item.emoji}
-                      </div>
-                      <div className="flex-1 py-3 pr-3">
-                        <p className="font-heading font-bold text-base text-foreground leading-tight">{item.label}</p>
-                        <p className="text-muted-foreground text-xs mt-0.5">{item.desc}</p>
-                      </div>
-                      <span className="pr-4 text-muted-foreground text-xl">›</span>
-                    </div>
-                  </Link>
-                )}
-              </motion.div>
-            ))}
-
-            {/* Botão de teste - remover em produção */}
-            <motion.div
-              initial={{ x: -60, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ delay: 0.3 + menuItems.length * 0.1 }}
-            >
-              <TestStickerButton onEarn={(rarity) => earnSticker('test', rarity)} />
-            </motion.div>
-          </>
-        ) : (
+        {menuItems.map((item, i) => (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="space-y-3"
+            key={item.to || item.id}
+            initial={{ x: -60, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ delay: 0.3 + i * 0.1 }}
           >
-            <button
-              onClick={() => setShowAlbum(false)}
-              className="flex items-center gap-2 text-muted-foreground text-sm hover:text-foreground transition-colors"
-            >
-              <ChevronDown className="w-4 h-4 rotate-90" />
-              Voltar
-            </button>
-            <AlbumView onClose={() => setShowAlbum(false)} />
+            {item.isAlbum ? (
+              <Link to="/sticker-album">
+                <div className="bg-card rounded-2xl shadow-lg border border-border/30 flex items-center gap-4 overflow-hidden active:scale-95 transition-transform relative">
+                  <div className={`bg-gradient-to-b ${item.color} w-16 h-16 flex-shrink-0 flex items-center justify-center text-3xl`}>
+                    {item.emoji}
+                  </div>
+                  <div className="flex-1 py-3 pr-3 text-left">
+                    <div className="flex items-center gap-2">
+                      <p className="font-heading font-bold text-base text-foreground leading-tight">{item.label}</p>
+                      {newStickersCount > 0 && (
+                        <span className="bg-pink-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                          {newStickersCount}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-muted-foreground text-xs mt-0.5">{item.desc}</p>
+                    {progress.obtained > 0 && (
+                      <p className="text-xs text-pink-500 font-semibold mt-0.5">
+                        {progress.obtained}/{progress.total} figurinhas
+                      </p>
+                    )}
+                  </div>
+                  <span className="pr-4 text-muted-foreground text-xl">›</span>
+                </div>
+              </Link>
+            ) : (
+              <Link to={item.to}>
+                <div className="bg-card rounded-2xl shadow-lg border border-border/30 flex items-center gap-4 overflow-hidden active:scale-95 transition-transform">
+                  <div className={`bg-gradient-to-b ${item.color} w-16 h-16 flex-shrink-0 flex items-center justify-center text-3xl`}>
+                    {item.emoji}
+                  </div>
+                  <div className="flex-1 py-3 pr-3">
+                    <p className="font-heading font-bold text-base text-foreground leading-tight">{item.label}</p>
+                    <p className="text-muted-foreground text-xs mt-0.5">{item.desc}</p>
+                  </div>
+                  <span className="pr-4 text-muted-foreground text-xl">›</span>
+                </div>
+              </Link>
+            )}
           </motion.div>
-        )}
+        ))}
+
+        {/* Botão de teste - remover em produção */}
+        <motion.div
+          initial={{ x: -60, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ delay: 0.3 + menuItems.length * 0.1 }}
+        >
+          <TestStickerButton onEarn={(rarity) => earnSticker('test', rarity)} />
+        </motion.div>
       </div>
 
       {/* Values strip */}

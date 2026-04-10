@@ -189,12 +189,6 @@ export const STICKERS_COLLECTION = [
   { id: 'player_bia', name: 'Bia', emoji: '🛡️', rarity: 'rare', category: 'player', description: 'Defensora feroz', unlockSource: ['career', 'story'], unlockRequirements: { careerLevel: 6, storyChapter: 3 }, hasGlitter: true },
   { id: 'player_duda', name: 'Duda', emoji: '⚡', rarity: 'epic', category: 'player', description: 'Lenda do cabeceio', unlockSource: ['career', 'minigame'], unlockRequirements: { careerLevel: 10, minigameId: 'headers', minScore: 150 }, hasGlitter: true, hasAnimation: true },
   
-  // === JOGADORAS REAIS DO BRASIL ===
-  ...BRAZIL_PLAYERS,
-  
-  // === JOGADORAS DO MUNDO ===
-  ...WORLD_PLAYERS,
-  
   // === MOMENTOS ===
   { id: 'moment_first_goal', name: 'Primeiro Gol', emoji: '🥅', rarity: 'common', category: 'moment', description: 'O gol que começou tudo', unlockSource: ['story'], unlockRequirements: { storyChapter: 1 } },
   { id: 'moment_team_huddle', name: 'Abraço em Grupo', emoji: '🤗', rarity: 'common', category: 'moment', description: 'União faz a força', unlockSource: ['story'], unlockRequirements: { storyChapter: 2 } },
