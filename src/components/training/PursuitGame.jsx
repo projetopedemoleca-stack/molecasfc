@@ -1,604 +1,509 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RotateCcw, ChevronLeft, ChevronRight, ArrowUp } from 'lucide-react';
-import { bgMusic } from '@/lib/trainingMusic';
-import { audio } from '@/lib/audioEngine';
-import { drawSticker, addSticker } from '@/lib/albumSystem.js';
-import { useStickerToast } from '@/components/ui/StickerEarnedToast.jsx';
+import { RotateCcw, Trophy } from 'lucide-react';
 
-// ─── Configuração de níveis ────────────────────────────────────────────────────
-const LEVELS = [
-  { id: 1, label: 'Iniciante',    botSpeed: 0.011, playerSpeed: 0.022, cones: 3, timeLimit: 35, goal: 3,  emoji: '🌱' },
-  { id: 2, label: 'Amadora',      botSpeed: 0.015, playerSpeed: 0.022, cones: 4, timeLimit: 32, goal: 4,  emoji: '⚽' },
-  { id: 3, label: 'Juvenil',      botSpeed: 0.019, playerSpeed: 0.024, cones: 5, timeLimit: 28, goal: 5,  emoji: '🔥' },
-  { id: 4, label: 'Sub-20',       botSpeed: 0.023, playerSpeed: 0.024, cones: 5, timeLimit: 25, goal: 6,  emoji: '⚡' },
-  { id: 5, label: 'Profissional', botSpeed: 0.027, playerSpeed: 0.026, cones: 6, timeLimit: 22, goal: 7,  emoji: '🏆' },
-  { id: 6, label: 'Seleção',      botSpeed: 0.032, playerSpeed: 0.026, cones: 7, timeLimit: 20, goal: 8,  emoji: '👑' },
-  { id: 7, label: 'Marta Mode',   botSpeed: 0.038, playerSpeed: 0.028, cones: 8, timeLimit: 18, goal: 9,  emoji: '🌟' },
+// ── Tipos de bola ──────────────────────────────────────────────────────────────
+const BALL_TYPES = [
+  { id: 'ball',       name: 'Bola',        emoji: '⚽', speed: 1.0, bounce: 0.8 },
+  { id: 'can',        name: 'Lata',        emoji: '🥫', speed: 0.95, bounce: 0.6 },
+  { id: 'bottle',     name: 'Garrafinha',  emoji: '🍾', speed: 0.9, bounce: 0.5 },
+  { id: 'cap',        name: 'Tampinha',    emoji: '🎯', speed: 1.1, bounce: 0.9 },
+  { id: 'paper',      name: 'Papel',       emoji: '📄', speed: 0.85, bounce: 0.3 },
+  { id: 'stone',      name: 'Pedra',       emoji: '🪨', speed: 0.7, bounce: 0.2 },
+  { id: 'lemon',      name: 'Limão',       emoji: '🍋', speed: 0.92, bounce: 0.7 },
+  { id: 'head',       name: 'Cabeça',      emoji: '🧠', speed: 0.88, bounce: 0.55 },
 ];
 
-const FW = 300; // field width
-const FH = 460; // field height
-const PR = 13;  // player radius
-const BR = 13;  // bot radius
-const CR = 8;   // cone radius
-const GOAL_Y = 38;
-const START_Y = FH - 55;
+// ── Obstáculos de rua ──────────────────────────────────────────────────────────
+const OBSTACLE_TYPES = [
+  { id: 'dog',    name: 'Cachorro',   emoji: '🐕', behavior: 'patrol' },
+  { id: 'car',    name: 'Carro',      emoji: '🚗', behavior: 'parked' },
+  { id: 'cat',    name: 'Gato',       emoji: '🐱', behavior: 'sleep' },
+  { id: 'bike',   name: 'Bicicleta',  emoji: '🚲', behavior: 'parked' },
+  { id: 'cone',   name: 'Cone',       emoji: '🚧', behavior: 'static' },
+];
 
-function shuffle(arr) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
+// ── Níveis ─────────────────────────────────────────────────────────────────────
+const LEVELS = [
+  { label: 'Rua Calma',      time: 60, goals: 3,  obstacles: 1, botSpeed: 0.8,  desc: 'Poucos obstáculos — calma!' },
+  { label: 'Beco Movimentado', time: 55, goals: 4,  obstacles: 2, botSpeed: 1.0,  desc: 'Cuidado com o cachorro!' },
+  { label: 'Praça Cheia',    time: 50, goals: 5,  obstacles: 3, botSpeed: 1.15, desc: 'Mais obstáculos na rua!' },
+  { label: 'Ruazinha Apertada', time: 45, goals: 5,  obstacles: 3, botSpeed: 1.3,  desc: 'Espaço apertado!' },
+  { label: 'Fim de Semana',  time: 40, goals: 6,  obstacles: 4, botSpeed: 1.5,  desc: 'Todo mundo na rua!' },
+];
 
-function genCones(count) {
-  const cones = [];
-  let tries = 0;
-  while (cones.length < count && tries < 300) {
-    tries++;
-    const x = 30 + Math.random() * (FW - 60);
-    const y = GOAL_Y + 55 + Math.random() * (START_Y - GOAL_Y - 110);
-    if (!cones.some(c => Math.hypot(c.x - x, c.y - y) < 55))
-      cones.push({ x, y, id: cones.length });
-  }
-  return cones;
-}
+const FIELD_W = 340;
+const FIELD_H = 480;
+const PLAYER_R = 18;
+const BALL_R = 12;
+const GOAL_W = 70;
+const GOAL_DEPTH = 25;
 
-// ─── Campo SVG ─────────────────────────────────────────────────────────────────
-function Field({ player, bot, cones, dodged, trail, particles, combo }) {
-  const dist = Math.hypot(player.x - bot.x, player.y - bot.y);
-  const danger = Math.max(0, (70 - dist) / 70);
+function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 
-  return (
-    <svg viewBox={`0 0 ${FW} ${FH}`} width="100%" style={{ display: 'block', touchAction: 'none' }}>
-      <defs>
-        <linearGradient id="pg" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#14532d" />
-          <stop offset="100%" stopColor="#166534" />
-        </linearGradient>
-        <radialGradient id="dangerGrad" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor={`rgba(239,68,68,${danger * 0.25})`} />
-          <stop offset="100%" stopColor="rgba(239,68,68,0)" />
-        </radialGradient>
-        <filter id="gp"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-        <filter id="gb"><feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-      </defs>
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 
-      {/* Grama */}
-      <rect width={FW} height={FH} fill="url(#pg)" />
-      {[0,1,2,3].map(i => (
-        <rect key={i} x={i*(FW/4)} y={0} width={FW/4} height={FH}
-          fill={i%2===0 ? 'rgba(0,0,0,0.06)' : 'transparent'} />
-      ))}
-
-      {/* Borda */}
-      <rect x={3} y={3} width={FW-6} height={FH-6} fill="none"
-        stroke="rgba(255,255,255,0.35)" strokeWidth={1.5} rx={3} />
-
-      {/* Zona de perigo (marcadora perto) */}
-      {danger > 0 && (
-        <ellipse cx={player.x} cy={player.y} rx={60} ry={60} fill="url(#dangerGrad)" />
-      )}
-
-      {/* Linha de chegada */}
-      <rect x={3} y={GOAL_Y - 22} width={FW - 6} height={30}
-        fill="rgba(255,255,255,0.12)" rx={3} />
-      {[...Array(14)].map((_, i) => (
-        <rect key={i}
-          x={3 + i*((FW-6)/28)} y={GOAL_Y-22}
-          width={(FW-6)/28} height={30}
-          fill={i%2===0 ? 'rgba(255,255,255,0.2)' : 'transparent'} />
-      ))}
-      <text x={FW/2} y={GOAL_Y-4} textAnchor="middle"
-        fontSize={11} fill="white" fontWeight="bold" fontFamily="sans-serif">
-        🏁 CHEGADA
-      </text>
-
-      {/* Trilha */}
-      {trail.length > 1 && (
-        <polyline
-          points={trail.map(p=>`${p.x},${p.y}`).join(' ')}
-          fill="none" stroke="rgba(250,204,21,0.45)"
-          strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
-        />
-      )}
-
-      {/* Cones */}
-      {cones.map(c => {
-        const ok = dodged.includes(c.id);
-        return (
-          <g key={c.id}>
-            {ok && <circle cx={c.x} cy={c.y} r={CR+5} fill="rgba(74,222,128,0.18)" stroke="rgba(74,222,128,0.4)" strokeWidth={1}/>}
-            <text x={c.x} y={c.y+6} textAnchor="middle" fontSize={ok?13:17} opacity={ok?0.3:1}>🔶</text>
-          </g>
-        );
-      })}
-
-      {/* Partículas */}
-      {particles.map(p => (
-        <circle key={p.id} cx={p.x} cy={p.y} r={p.r} fill={p.color} opacity={p.opacity} />
-      ))}
-
-      {/* Linha de perigo bot→player */}
-      {danger > 0.3 && (
-        <line x1={player.x} y1={player.y} x2={bot.x} y2={bot.y}
-          stroke={`rgba(239,68,68,${danger*0.5})`} strokeWidth={1.5} strokeDasharray="5 3" />
-      )}
-
-      {/* Bola (jogadora) */}
-      <g filter="url(#gp)">
-        <circle cx={player.x} cy={player.y} r={PR}
-          fill="#fde68a" stroke="#f59e0b" strokeWidth={1.5} />
-        <text x={player.x} y={player.y+5} textAnchor="middle" fontSize={15}>⚽</text>
-      </g>
-
-      {/* Bot (marcadora) */}
-      <g filter="url(#gb)">
-        <circle cx={bot.x} cy={bot.y} r={BR}
-          fill="#fca5a5" stroke="#ef4444" strokeWidth={2} />
-        <text x={bot.x} y={bot.y+5} textAnchor="middle" fontSize={13}>👊</text>
-      </g>
-
-      {/* Combo badge */}
-      {combo >= 2 && (
-        <g>
-          <circle cx={player.x+17} cy={player.y-17} r={10}
-            fill="#7c3aed" stroke="white" strokeWidth={1.5} />
-          <text x={player.x+17} y={player.y-13} textAnchor="middle"
-            fontSize={8} fill="white" fontWeight="bold" fontFamily="sans-serif">
-            x{combo}
-          </text>
-        </g>
-      )}
-    </svg>
-  );
-}
-
-// ─── Componente Principal ──────────────────────────────────────────────────────
-export default function PursuitGame() {
-  useEffect(() => { bgMusic.play('sport'); return () => bgMusic.stop(); }, []);
-  const { showToast, StickerToast } = useStickerToast();
-
-  const [levelIdx, setLevelIdx] = useState(0);
-  const [phase, setPhase] = useState('menu'); // menu | playing | caught | win | lose
+// ── Componente principal ──────────────────────────────────────────────────────
+export default function PursuitGame({ onStickerEarned }) {
+  const [phase, setPhase] = useState('menu'); // menu | select | playing | goal | complete
+  const [level, setLevel] = useState(0);
   const [score, setScore] = useState(0);
-  const [combo, setCombo] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(35);
-  const [cones, setCones] = useState([]);
-  const [dodged, setDodged] = useState([]);
-  const [trail, setTrail] = useState([]);
-  const [particles, setParticles] = useState([]);
-  const [totalWins, setTotalWins] = useState(0);
+  const [goals, setGoals] = useState(0);
+  const [time, setTime] = useState(60);
+  const [lives, setLives] = useState(3);
 
-  const playerRef = useRef({ x: FW/2, y: START_Y });
-  const botRef    = useRef({ x: FW/2-40, y: START_Y+15 });
-  const [playerPos, setPlayerPos] = useState({ x: FW/2, y: START_Y });
-  const [botPos,    setBotPos]    = useState({ x: FW/2-40, y: START_Y+15 });
+  // Posição do jogador (bola)
+  const [player, setPlayer] = useState({ x: FIELD_W / 2, y: FIELD_H - 50 });
+  // Posição do marcador adversário
+  const [bot, setBot] = useState({ x: FIELD_W / 2, y: 50 });
+  // Obstáculos dinâmicos
+  const [obstacles, setObstacles] = useState([]);
 
-  const rafRef    = useRef(null);
-  const phaseRef  = useRef('menu');
-  const scoreRef  = useRef(0);
-  const comboRef  = useRef(0);
-  const timerRef  = useRef(null);
+  // Seleção de bola
+  const [selectedBall, setSelectedBall] = useState(BALL_TYPES[0]);
+  // Direção do movimento (joystick)
+  const [moveDir, setMoveDir] = useState({ x: 0, y: 0 });
 
-  const cfg = LEVELS[Math.min(levelIdx, LEVELS.length - 1)];
+  const rafRef = useRef(null);
+  const lastTimeRef = useRef(0);
+  const gameRef = useRef({ phase: 'menu', player, bot, obstacles, time });
 
-  // ─── Partículas ─────────────────────────────────────────────────────────────
-  const spawnParticles = useCallback((x, y, isCombo) => {
-    const color = isCombo ? '#a855f7' : '#fbbf24';
-    const ps = Array.from({length: 7}, (_, i) => ({
-      id: Date.now()+i,
-      x: x + (Math.random()-.5)*18,
-      y: y + (Math.random()-.5)*18,
-      r: 2 + Math.random()*4,
-      color, opacity: 0.85,
-    }));
-    setParticles(p => [...p, ...ps]);
-    setTimeout(() => setParticles(p => p.filter(pp => !ps.find(np => np.id===pp.id))), 450);
+  const cfg = LEVELS[level] || LEVELS[0];
+
+  // ── Inicializar nível ────────────────────────────────────────────────────────
+  const initLevel = useCallback((lvl) => {
+    const c = LEVELS[lvl] || LEVELS[0];
+    setLevel(lvl);
+    setPlayer({ x: FIELD_W / 2, y: FIELD_H - 50 });
+    setBot({ x: FIELD_W / 2, y: 50 });
+    setGoals(0);
+    setTime(c.time);
+
+    // Gerar obstáculos
+    const obs = [];
+    const types = OBSTACLE_TYPES.slice(0, c.obstacles + 1);
+    for (let i = 0; i < c.obstacles; i++) {
+      const type = types[i % types.length];
+      const yZone = 80 + (i + 1) * ((FIELD_H - 160) / (c.obstacles + 1));
+      obs.push({
+        id: i,
+        type: type.id,
+        emoji: type.emoji,
+        behavior: type.behavior,
+        x: 40 + Math.random() * (FIELD_W - 80),
+        y: yZone,
+        dir: Math.random() > 0.5 ? 1 : -1,
+        speed: 0.4 + Math.random() * 0.3,
+      });
+    }
+    setObstacles(obs);
+    gameRef.current = { phase: 'playing', player: { x: FIELD_W / 2, y: FIELD_H - 50 }, bot: { x: FIELD_W / 2, y: 50 }, obstacles: obs, time: c.time };
+    setPhase('playing');
   }, []);
 
-  // ─── Iniciar rodada ──────────────────────────────────────────────────────────
-  const startRound = useCallback(() => {
-    const c = LEVELS[Math.min(levelIdx, LEVELS.length-1)];
-    cancelAnimationFrame(rafRef.current);
-    clearInterval(timerRef.current);
-
-    const px = FW/2, py = START_Y;
-    const bx = FW/2 + (Math.random()>.5 ? -50 : 50);
-    const by = START_Y + 20;
-
-    playerRef.current = { x: px, y: py };
-    botRef.current    = { x: bx, y: by };
-    setPlayerPos({ x: px, y: py });
-    setBotPos({ x: bx, y: by });
-    setCones(genCones(c.cones));
-    setDodged([]);
-    setTrail([{ x: px, y: py }]);
-    setParticles([]);
-    setScore(0); scoreRef.current = 0;
-    setCombo(0); comboRef.current = 0;
-    setTimeLeft(c.timeLimit);
-    phaseRef.current = 'playing';
-    setPhase('playing');
-  }, [levelIdx]);
-
-  // ─── Loop principal ──────────────────────────────────────────────────────────
+  // ── Game loop ────────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (phase !== 'playing') return;
+    if (phase !== 'playing') { cancelAnimationFrame(rafRef.current); return; }
 
-    const c = LEVELS[Math.min(levelIdx, LEVELS.length-1)];
-    let last = null;
+    const loop = (now) => {
+      const dt = lastTimeRef.current ? Math.min((now - lastTimeRef.current) / 16, 2.5) : 1;
+      lastTimeRef.current = now;
 
-    const loop = (ts) => {
-      if (phaseRef.current !== 'playing') return;
-      if (!last) last = ts;
-      const dt = Math.min(ts - last, 50);
-      last = ts;
+      // Move jogador (bola) com joystick/direção
+      const speed = 3.5 * selectedBall.speed;
+      gameRef.current.player.x = clamp(
+        gameRef.current.player.x + moveDir.x * speed * dt,
+        PLAYER_R + 5, FIELD_W - PLAYER_R - 5
+      );
+      gameRef.current.player.y = clamp(
+        gameRef.current.player.y + moveDir.y * speed * dt,
+        PLAYER_R + 5, FIELD_H - PLAYER_R - 5
+      );
 
-      const p = playerRef.current;
-      const b = botRef.current;
-      const dx = p.x - b.x, dy = p.y - b.y;
-      const dist = Math.hypot(dx, dy);
+      // Bot persegue a bola
+      const dx = gameRef.current.player.x - gameRef.current.bot.x;
+      const dy = gameRef.current.player.y - gameRef.current.bot.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const botSpeed = cfg.botSpeed * dt;
+      gameRef.current.bot.x = clamp(gameRef.current.bot.x + (dx / d) * botSpeed, PLAYER_R, FIELD_W - PLAYER_R);
+      gameRef.current.bot.y = clamp(gameRef.current.bot.y + (dy / d) * botSpeed, PLAYER_R, FIELD_H - PLAYER_R);
 
-      if (dist > 0.5) {
-        const spd = c.botSpeed * dt * FW;
-        const nx = b.x + (dx/dist)*spd;
-        const ny = b.y + (dy/dist)*spd;
-        botRef.current = { x: nx, y: ny };
-        setBotPos({ x: nx, y: ny });
-      }
+      // Move obstáculos
+      gameRef.current.obstacles = gameRef.current.obstacles.map(o => {
+        if (o.behavior === 'patrol') {
+          let nx = o.x + o.dir * o.speed * dt * 2;
+          if (nx < 30 || nx > FIELD_W - 30) o.dir *= -1;
+          return { ...o, x: clamp(nx, 30, FIELD_W - 30) };
+        }
+        return o;
+      });
 
-      // Captura
-      if (dist < PR + BR - 3) {
-        phaseRef.current = 'caught';
-        setPhase('caught');
-        try { audio.playLose?.(); } catch {}
+      // Colisão com bot = perde vida
+      if (dist(gameRef.current.player, gameRef.current.bot) < PLAYER_R + PLAYER_R - 4) {
+        const newLives = lives - 1;
+        setLives(newLives);
+        if (newLives <= 0) {
+          gameRef.current.phase = 'complete';
+          setPhase('complete');
+        } else {
+          // Respawn
+          gameRef.current.player = { x: FIELD_W / 2, y: FIELD_H - 50 };
+          gameRef.current.bot = { x: FIELD_W / 2, y: 50 };
+          setPlayer({ x: FIELD_W / 2, y: FIELD_H - 50 });
+          setBot({ x: FIELD_W / 2, y: 50 });
+        }
         return;
       }
+
+      // Gol! Chegou no gol do adversário (topo)
+      if (gameRef.current.player.y < GOAL_DEPTH + PLAYER_R) {
+        const inGoal = Math.abs(gameRef.current.player.x - FIELD_W / 2) < GOAL_W / 2;
+        if (inGoal) {
+          const newGoals = goals + 1;
+          const newScore = score + (level + 1) * 10;
+          setGoals(newGoals);
+          setScore(newScore);
+          if (newGoals >= cfg.goals) {
+            // Avança nível
+            const nextLvl = level + 1;
+            if (nextLvl >= LEVELS.length) {
+              gameRef.current.phase = 'complete';
+              setPhase('complete');
+            } else {
+              initLevel(nextLvl);
+            }
+          } else {
+            // Respawn para continuar
+            gameRef.current.player = { x: FIELD_W / 2, y: FIELD_H - 50 };
+            gameRef.current.bot = { x: FIELD_W / 2, y: 50 };
+          }
+          return;
+        }
+      }
+
+      // Colisão com obstáculos = empurra
+      gameRef.current.obstacles.forEach(o => {
+        const d = dist(gameRef.current.player, o);
+        if (d < PLAYER_R + 15) {
+          const angle = Math.atan2(gameRef.current.player.y - o.y, gameRef.current.player.x - o.x);
+          gameRef.current.player.x += Math.cos(angle) * 2;
+          gameRef.current.player.y += Math.sin(angle) * 2;
+        }
+      });
+
+      setPlayer({ ...gameRef.current.player });
+      setBot({ ...gameRef.current.bot });
+      setObstacles([...gameRef.current.obstacles]);
 
       rafRef.current = requestAnimationFrame(loop);
     };
 
     rafRef.current = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [phase, moveDir, selectedBall, cfg, goals, level, lives, score, initLevel]);
 
-    // Timer regressivo
-    timerRef.current = setInterval(() => {
-      setTimeLeft(t => {
-        if (t <= 1) {
-          clearInterval(timerRef.current);
-          if (phaseRef.current === 'playing') {
-            phaseRef.current = 'lose';
-            setPhase('lose');
-          }
+  // ── Timer ────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (phase !== 'playing') return;
+    const t = setInterval(() => {
+      setTime(prev => {
+        if (prev <= 1) {
+          setPhase('complete');
           return 0;
         }
-        return t - 1;
+        return prev - 1;
       });
     }, 1000);
+    return () => clearInterval(t);
+  }, [phase]);
 
-    return () => {
-      cancelAnimationFrame(rafRef.current);
-      clearInterval(timerRef.current);
+  // ── Controles ────────────────────────────────────────────────────────────────
+  const handleKeyDown = useCallback((e) => {
+    if (phase !== 'playing') return;
+    const dirs = {
+      ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
+      w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0],
     };
-  }, [phase, levelIdx]);
+    const d = dirs[e.key];
+    if (d) setMoveDir({ x: d[0], y: d[1] });
+  }, [phase]);
 
-  // ─── Mover jogadora ──────────────────────────────────────────────────────────
-  const move = useCallback((dir) => {
-    if (phaseRef.current !== 'playing') return;
+  const handleKeyUp = useCallback((e) => {
+    const stopKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 's', 'a', 'd'];
+    if (stopKeys.includes(e.key)) setMoveDir({ x: 0, y: 0 });
+  }, []);
 
-    const c = LEVELS[Math.min(levelIdx, LEVELS.length-1)];
-    const step = c.playerSpeed * FW * 16;
-    const p = playerRef.current;
-
-    let nx = p.x, ny = p.y;
-    if (dir === 'left')  nx = Math.max(PR+3,    p.x - step*1.4);
-    if (dir === 'right') nx = Math.min(FW-PR-3,  p.x + step*1.4);
-    if (dir === 'up')    ny = Math.max(PR+3,    p.y - step*1.6);
-
-    playerRef.current = { x: nx, y: ny };
-    setPlayerPos({ x: nx, y: ny });
-    setTrail(t => [...t.slice(-20), { x: nx, y: ny }]);
-
-    // Verificar cones
-    setCones(prev => {
-      prev.forEach(cone => {
-        const d = Math.hypot(cone.x - nx, cone.y - ny);
-        if (d < CR + PR + 8) {
-          setDodged(dd => {
-            if (dd.includes(cone.id)) return dd;
-            const nc = comboRef.current + 1;
-            comboRef.current = nc;
-            setCombo(nc);
-            const ns = scoreRef.current + 1;
-            scoreRef.current = ns;
-            setScore(ns);
-            spawnParticles(cone.x, cone.y, nc >= 3);
-            try { audio.playDribble?.(); } catch {}
-            return [...dd, cone.id];
-          });
-        }
-      });
-      return prev;
-    });
-
-    // Chegada
-    if (ny <= GOAL_Y + 12) {
-      phaseRef.current = 'win';
-      setPhase('win');
-      setTotalWins(w => w+1);
-      try { audio.playGoal?.(); } catch {}
-
-      const rarity = scoreRef.current >= 7 ? 'epic'
-        : scoreRef.current >= 5 ? 'rare'
-        : comboRef.current >= 3 ? 'uncommon'
-        : null;
-      const def = drawSticker('minigame_dribble', rarity);
-      const result = addSticker(def.id, 'minigame_dribble', true);
-      if (result) showToast({ ...result, definition: def });
-    }
-  }, [levelIdx, spawnParticles, showToast]);
-
-  // ─── Teclado ─────────────────────────────────────────────────────────────────
   useEffect(() => {
-    const onKey = (e) => {
-      if (e.key==='ArrowLeft')               move('left');
-      if (e.key==='ArrowRight')              move('right');
-      if (e.key==='ArrowUp'||e.key===' ')   { e.preventDefault(); move('up'); }
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [move]);
+  }, [handleKeyDown, handleKeyUp]);
 
-  // ─── Swipe ───────────────────────────────────────────────────────────────────
-  const ts = useRef(null);
-  const onTouchStart = (e) => { ts.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; };
-  const onTouchEnd = (e) => {
-    if (!ts.current) return;
-    const dx = e.changedTouches[0].clientX - ts.current.x;
-    const dy = e.changedTouches[0].clientY - ts.current.y;
-    ts.current = null;
-    if (Math.abs(dy) > Math.abs(dx) && dy < -12) { move('up'); return; }
-    if (Math.abs(dx) > 12) move(dx < 0 ? 'left' : 'right');
+  // D-pad touch
+  const setMove = (dx, dy) => {
+    if (phase === 'playing') setMoveDir({ x: dx, y: dy });
   };
 
-  const timerColor = timeLeft <= 5 ? 'text-red-500 animate-pulse' : timeLeft <= 10 ? 'text-orange-500' : 'text-green-600';
-
-  // ─── MENU ────────────────────────────────────────────────────────────────────
+  // ── MENU ─────────────────────────────────────────────────────────────────────
   if (phase === 'menu') return (
-    <div className="space-y-5">
+    <div className="flex flex-col items-center justify-center min-h-[80vh] gap-5 px-4">
+      <div style={{
+        width: 200, height: 150, borderRadius: 16, overflow: 'hidden',
+        background: 'linear-gradient(180deg,#78350f 0%,#92400e 50%,#a16207 100%)',
+        boxShadow: '0 8px 32px rgba(120,53,15,0.5)',
+        position: 'relative',
+      }}>
+        {/* Linhas da rua */}
+        <div style={{ position: 'absolute', inset: 0 }}>
+          <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 3, background: '#fde047', transform: 'translateX(-50%)' }} />
+          <div style={{ position: 'absolute', left: 20, top: 0, bottom: 0, width: 2, background: 'rgba(255,255,255,0.2)' }} />
+          <div style={{ position: 'absolute', right: 20, top: 0, bottom: 0, width: 2, background: 'rgba(255,255,255,0.2)' }} />
+        </div>
+        {/* Gol em cima */}
+        <div style={{ position: 'absolute', top: 5, left: '50%', transform: 'translateX(-50%)', width: 60, height: 20, border: '2px solid white', borderBottom: 'none', borderRadius: '4px 4px 0 0' }} />
+        {/* Gol em baixo */}
+        <div style={{ position: 'absolute', bottom: 5, left: '50%', transform: 'translateX(-50%)', width: 60, height: 20, border: '2px solid white', borderTop: 'none', borderRadius: '0 0 4px 4px' }} />
+        {/* Bonecos */}
+        <motion.div animate={{ y: [0, -5, 0] }} transition={{ duration: 1.5, repeat: Infinity }}
+          style={{ position: 'absolute', left: '50%', bottom: 30, transform: 'translateX(-50%)', fontSize: 22 }}>{selectedBall.emoji}</motion.div>
+        <motion.div animate={{ y: [0, 5, 0] }} transition={{ duration: 1.8, repeat: Infinity }}
+          style={{ position: 'absolute', left: '30%', top: 25, fontSize: 18 }}>🧑</motion.div>
+        <motion.div animate={{ x: [0, 30, 0] }} transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }}
+          style={{ position: 'absolute', top: 70, left: 20, fontSize: 16 }}>🐕</motion.div>
+        <div style={{ position: 'absolute', right: 15, top: 55, fontSize: 20 }}>🚗</div>
+      </div>
+
       <div className="text-center">
-        <motion.div className="text-6xl mb-2"
-          animate={{ y: [-4,4,-4] }} transition={{ repeat: Infinity, duration: 1.3 }}>
-          🔥
-        </motion.div>
-        <h2 className="font-heading font-black text-2xl">Drible com Marcador</h2>
-        <p className="text-muted-foreground text-sm mt-1">Avance pelo campo, desvie dos cones e fuja da marcadora!</p>
+        <h1 className="font-heading font-black text-3xl text-primary mb-1">Fut de Rua!</h1>
+        <p className="text-gray-500 text-sm">1v1 no beco — escolha sua bola e desvie dos obstáculos!</p>
       </div>
 
-      {/* Como jogar */}
-      <div className="grid grid-cols-3 gap-2">
-        {[
-          { icon:'⬆️', text:'Avançar\npara a meta' },
-          { icon:'↔️', text:'Desviar\ndos cones' },
-          { icon:'👊', text:'Não deixe\na marcadora\nte pegar!' },
-        ].map((item, i) => (
-          <div key={i} className="bg-card border border-border/30 rounded-2xl p-3 text-center space-y-1">
-            <div className="text-2xl">{item.icon}</div>
-            <p className="text-xs text-muted-foreground leading-tight whitespace-pre-line">{item.text}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Seleção de nível */}
-      <div className="space-y-2">
-        <p className="text-xs font-bold text-muted-foreground uppercase">Nível</p>
-        <div className="grid grid-cols-4 gap-1.5">
-          {LEVELS.map((lvl, i) => {
-            const unlocked = i <= totalWins;
-            return (
-              <button key={i} disabled={!unlocked}
-                onClick={() => setLevelIdx(i)}
-                className={`py-2 rounded-xl text-xs font-bold border-2 transition-all ${
-                  levelIdx === i
-                    ? 'bg-primary text-primary-foreground border-primary shadow-lg'
-                    : unlocked
-                    ? 'bg-card border-border/30 hover:border-primary/40'
-                    : 'opacity-25 cursor-not-allowed border-border/20'
-                }`}>
-                {unlocked ? lvl.emoji : '🔒'}
-              </button>
-            );
-          })}
-        </div>
-        <div className="bg-muted/30 rounded-xl p-2.5 text-center">
-          <p className="font-bold text-sm">{cfg.emoji} {cfg.label}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            ⏱ {cfg.timeLimit}s · 🔶 {cfg.cones} cones · Meta: {cfg.goal} dribles
-          </p>
-        </div>
-      </div>
-
-      <motion.button whileTap={{ scale: 0.95 }} onClick={startRound}
-        className="w-full py-5 rounded-3xl font-heading font-black text-xl text-white shadow-xl"
-        style={{ background: 'linear-gradient(135deg,#7c3aed,#db2777)' }}>
-        ▶ Começar!
+      <motion.button whileTap={{ scale: 0.95 }} whileHover={{ scale: 1.03 }}
+        onClick={() => setPhase('select')}
+        className="w-full max-w-xs py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-heading font-black text-xl rounded-2xl shadow-lg"
+      >
+        Escolher Bola ⚽
       </motion.button>
-      <StickerToast />
     </div>
   );
 
-  // ─── JOGO ────────────────────────────────────────────────────────────────────
-  return (
-    <div className="space-y-3 select-none">
-
-      {/* HUD */}
-      <div className="flex items-center justify-between gap-2 px-1">
-        <button
-          onClick={() => { phaseRef.current='menu'; cancelAnimationFrame(rafRef.current); clearInterval(timerRef.current); setPhase('menu'); }}
-          className="text-sm text-muted-foreground font-semibold"
+  // ── SELEÇÃO DE BOLA ──────────────────────────────────────────────────────────
+  if (phase === 'select') return (
+    <div className="flex flex-col items-center justify-center min-h-[80vh] gap-5 px-4">
+      <h2 className="font-heading font-black text-2xl text-primary">Escolha sua Bola</h2>
+      <div className="grid grid-cols-4 gap-3 w-full max-w-xs">
+        {BALL_TYPES.map(b => (
+          <motion.button key={b.id} whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.1 }}
+            onClick={() => setSelectedBall(b)}
+            className={`aspect-square rounded-xl flex flex-col items-center justify-center text-2xl
+              ${selectedBall.id === b.id ? 'bg-primary text-white ring-2 ring-primary' : 'bg-white text-gray-700'}`}
+          >
+            {b.emoji}
+            <span className="text-[9px] font-bold mt-1">{b.name}</span>
+          </motion.button>
+        ))}
+      </div>
+      <div className="bg-amber-50 rounded-xl p-3 w-full max-w-xs text-center">
+        <p className="text-xs text-amber-700">
+          <strong>{selectedBall.name}</strong> — Velocidade: {Math.round(selectedBall.speed * 100)}%
+        </p>
+      </div>
+      <div className="flex gap-3 w-full max-w-xs">
+        <motion.button whileTap={{ scale: 0.95 }} onClick={() => setPhase('menu')}
+          className="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl">Voltar</motion.button>
+        <motion.button whileTap={{ scale: 0.95 }}
+          onClick={() => { setScore(0); setLives(3); initLevel(0); }}
+          className="flex-1 py-3 bg-gradient-to-r from-primary to-green-500 text-white font-heading font-bold rounded-xl shadow"
         >
-          ← Sair
-        </button>
+          Jogar!
+        </motion.button>
+      </div>
+    </div>
+  );
 
-        <div className="flex items-center gap-3">
-          <AnimatePresence>
-            {combo >= 2 && (
-              <motion.span key={combo}
-                initial={{ scale:0, opacity:0 }} animate={{ scale:1, opacity:1 }} exit={{ scale:0, opacity:0 }}
-                className="bg-purple-600 text-white text-xs font-black px-2 py-1 rounded-lg">
-                🔥 x{combo}
-              </motion.span>
-            )}
-          </AnimatePresence>
+  // ── COMPLETE ─────────────────────────────────────────────────────────────────
+  if (phase === 'complete') return (
+    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+      className="flex flex-col items-center justify-center min-h-[80vh] gap-6 px-4 text-center"
+    >
+      <motion.div animate={{ rotate: [0, 10, -10, 0] }} transition={{ duration: 0.5, delay: 0.2 }}>
+        <Trophy className="w-20 h-20 text-yellow-500 mx-auto" />
+      </motion.div>
+      <div>
+        <h1 className="font-heading font-black text-3xl text-primary mb-1">
+          {lives <= 0 ? 'Fim de Jogo!' : time <= 0 ? 'Tempo Esgotado!' : 'Jogo da Rua!'}
+        </h1>
+        <p className="text-gray-500">{lives <= 0 ? 'O marcador te pegou!' : 'Bom jogo!'}</p>
+      </div>
+      <div className="bg-gradient-to-br from-amber-100 to-orange-100 rounded-2xl p-6 w-full max-w-xs">
+        <div className="text-5xl font-black text-amber-600">{score}</div>
+        <div className="text-gray-500 text-sm mt-1">pontos</div>
+        <div className="flex justify-around mt-4 text-sm">
+          <div><div className="font-bold text-primary">{goals}</div><div className="text-gray-400">Gols</div></div>
+          <div><div className="font-bold text-amber-500">{level + 1}</div><div className="text-gray-400">Nível</div></div>
+        </div>
+      </div>
+      <div className="flex gap-3 w-full max-w-xs">
+        <motion.button whileTap={{ scale: 0.95 }}
+          onClick={() => { setScore(0); setLives(3); initLevel(0); }}
+          className="flex-1 py-3 bg-gradient-to-r from-primary to-green-500 text-white font-heading font-bold rounded-xl shadow"
+        >
+          Jogar de Novo
+        </motion.button>
+        <motion.button whileTap={{ scale: 0.95 }}
+          onClick={() => setPhase('menu')}
+          className="py-3 px-4 bg-gray-100 text-gray-600 font-bold rounded-xl"
+        >
+          Menu
+        </motion.button>
+      </div>
+    </motion.div>
+  );
 
-          <div className="text-center">
-            <span className="font-black text-lg text-primary">{score}</span>
-            <span className="text-xs text-muted-foreground">/{cfg.goal}</span>
-          </div>
-
-          <span className={`font-black text-xl tabular-nums ${timerColor}`}>{timeLeft}s</span>
+  // ── PLAYING ───────────────────────────────────────────────────────────────────
+  return (
+    <div className="flex flex-col items-center gap-3 pt-2 pb-4 select-none">
+      {/* HUD */}
+      <div className="flex items-center justify-between w-full max-w-sm px-2">
+        <div className="flex gap-1">
+          {[0,1,2].map(i => (
+            <span key={i} className="text-xl">{i < lives ? '❤️' : '🖤'}</span>
+          ))}
+        </div>
+        <div className="text-center">
+          <div className="font-heading font-black text-primary">{cfg.label}</div>
+          <div className="text-xs text-gray-500">{goals}/{cfg.goals} gols</div>
+        </div>
+        <div className="text-right">
+          <div className="font-heading font-black text-xl text-primary">{score}</div>
+          <div className="text-xs text-gray-400">{time}s</div>
         </div>
       </div>
 
-      {/* Barra de progresso */}
-      <div className="h-2.5 bg-muted rounded-full overflow-hidden mx-1">
+      {/* Campo de rua */}
+      <div style={{
+        position: 'relative',
+        width: FIELD_W, height: FIELD_H,
+        borderRadius: 12, overflow: 'hidden',
+        background: 'linear-gradient(180deg,#78350f 0%,#92400e 50%,#a16207 100%)',
+        boxShadow: '0 8px 32px rgba(120,53,15,0.5)',
+      }}>
+        {/* Linhas da rua */}
+        <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 3, background: '#fde047', transform: 'translateX(-50%)' }} />
+        <div style={{ position: 'absolute', left: 15, top: 0, bottom: 0, width: 2, background: 'rgba(255,255,255,0.15)' }} />
+        <div style={{ position: 'absolute', right: 15, top: 0, bottom: 0, width: 2, background: 'rgba(255,255,255,0.15)' }} />
+
+        {/* Gol do adversário (topo) */}
+        <div style={{
+          position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
+          width: GOAL_W, height: GOAL_DEPTH,
+          background: 'rgba(255,255,255,0.15)',
+          border: '3px solid white', borderBottom: 'none',
+          borderRadius: '6px 6px 0 0',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <span style={{ fontSize: 16 }}>🥅</span>
+        </div>
+
+        {/* Seu gol (base) */}
+        <div style={{
+          position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)',
+          width: GOAL_W, height: GOAL_DEPTH,
+          background: 'rgba(255,255,255,0.1)',
+          border: '2px solid rgba(255,255,255,0.4)', borderTop: 'none',
+          borderRadius: '0 0 6px 6px',
+        }} />
+
+        {/* Obstáculos */}
+        {obstacles.map(o => (
+          <motion.div key={o.id}
+            animate={o.behavior === 'patrol' ? { x: [o.x - 20, o.x + 20, o.x - 20] } : {}}
+            transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+            style={{
+              position: 'absolute',
+              left: o.x, top: o.y,
+              transform: 'translate(-50%,-50%)',
+              fontSize: 24,
+              filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))',
+            }}
+          >
+            {o.emoji}
+          </motion.div>
+        ))}
+
+        {/* Marcador adversário */}
         <motion.div
-          className="h-full rounded-full bg-gradient-to-r from-purple-500 to-pink-500"
-          animate={{ width: `${Math.min((score/cfg.goal)*100, 100)}%` }}
-          transition={{ type:'spring', damping:20 }}
-        />
+          animate={{ scale: [1, 1.05, 1] }}
+          transition={{ duration: 0.8, repeat: Infinity }}
+          style={{
+            position: 'absolute',
+            left: bot.x, top: bot.y,
+            transform: 'translate(-50%,-50%)',
+            width: PLAYER_R * 2, height: PLAYER_R * 2,
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg,#dc2626,#ef4444)',
+            border: '3px solid white',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 20, boxShadow: '0 0 15px rgba(239,68,68,0.6)',
+          }}
+        >
+          🧑
+        </motion.div>
+
+        {/* Jogador (bola escolhida) */}
+        <motion.div
+          style={{
+            position: 'absolute',
+            left: player.x, top: player.y,
+            transform: 'translate(-50%,-50%)',
+            fontSize: 28,
+            filter: 'drop-shadow(0 3px 6px rgba(0,0,0,0.5))',
+          }}
+        >
+          {selectedBall.emoji}
+        </motion.div>
       </div>
 
-      {/* Campo */}
-      <div
-        className="relative mx-auto rounded-3xl overflow-hidden shadow-2xl border-2 border-white/10"
-        style={{ width:'100%', maxWidth:340, touchAction:'none' }}
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
-      >
-        <Field
-          player={playerPos} bot={botPos}
-          cones={cones} dodged={dodged}
-          trail={trail} particles={particles}
-          combo={combo}
-        />
+      <div className="text-xs text-gray-400">{cfg.desc}</div>
 
-        {/* Overlay resultado */}
-        <AnimatePresence>
-          {(phase==='win'||phase==='caught'||phase==='lose') && (
-            <motion.div
-              initial={{ opacity:0 }} animate={{ opacity:1 }}
-              className={`absolute inset-0 flex flex-col items-center justify-center gap-4 ${
-                phase==='win' ? 'bg-green-900/88' : 'bg-red-900/88'
-              }`}
-            >
-              <motion.div
-                initial={{ scale:0, rotate:-20 }} animate={{ scale:1, rotate:0 }}
-                transition={{ type:'spring', stiffness:280 }}
-                className="text-7xl"
-              >
-                {phase==='win' ? '🏆' : phase==='caught' ? '🛑' : '⏰'}
-              </motion.div>
-
-              <div className="text-center px-4">
-                <p className="font-heading font-black text-white text-2xl">
-                  {phase==='win' ? 'Chegou!' : phase==='caught' ? 'Te pegaram!' : 'Acabou o tempo!'}
-                </p>
-                <p className="text-white/70 text-sm mt-1">
-                  {phase==='win'
-                    ? `${score} dribles · combo x${combo}`
-                    : `${score} drible${score!==1?'s':''} antes de parar`}
-                </p>
-              </div>
-
-              {/* Estrelas */}
-              <div className="flex gap-2">
-                {Array.from({ length: cfg.goal }).map((_, i) => (
-                  <motion.div key={i}
-                    initial={{ scale:0 }} animate={{ scale:1 }}
-                    transition={{ delay: i*0.07 }}
-                    className={`w-7 h-7 rounded-full flex items-center justify-center text-sm ${
-                      i < score ? 'bg-yellow-400' : 'bg-white/20'
-                    }`}
-                  >
-                    {i < score ? '⭐' : '○'}
-                  </motion.div>
-                ))}
-              </div>
-
-              {/* Botões */}
-              <div className="flex gap-2 px-6 w-full">
-                <motion.button
-                  initial={{ y:20, opacity:0 }} animate={{ y:0, opacity:1 }} transition={{ delay:0.4 }}
-                  whileTap={{ scale:0.95 }} onClick={startRound}
-                  className="flex-1 py-3 bg-white text-gray-900 rounded-2xl font-heading font-bold flex items-center justify-center gap-1.5"
-                >
-                  <RotateCcw className="w-4 h-4" /> Tentar de novo
-                </motion.button>
-
-                {phase==='win' && levelIdx < LEVELS.length-1 && (
-                  <motion.button
-                    initial={{ y:20, opacity:0 }} animate={{ y:0, opacity:1 }} transition={{ delay:0.5 }}
-                    whileTap={{ scale:0.95 }}
-                    onClick={() => { setLevelIdx(l=>l+1); setPhase('menu'); }}
-                    className="flex-1 py-3 bg-yellow-400 text-yellow-900 rounded-2xl font-heading font-bold"
-                  >
-                    Próximo →
-                  </motion.button>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* Controles */}
-      {phase === 'playing' && (
-        <div className="space-y-2 px-2">
-          <div className="flex justify-center">
-            <motion.button
-              whileTap={{ scale:0.86, y:-3 }}
-              onPointerDown={() => move('up')}
-              className="w-20 h-14 rounded-2xl font-black text-white text-2xl shadow-lg flex items-center justify-center active:brightness-110"
-              style={{ background:'linear-gradient(135deg,#7c3aed,#a855f7)' }}
-            >
-              <ArrowUp className="w-7 h-7" />
-            </motion.button>
+      {/* D-pad */}
+      <div className="flex flex-col items-center gap-1">
+        <motion.button whileTap={{ scale: 0.85 }}
+          onTouchStart={() => setMove(0, -1)} onTouchEnd={() => setMove(0, 0)}
+          onMouseDown={() => setMove(0, -1)} onMouseUp={() => setMove(0, 0)}
+          className="w-14 h-14 bg-amber-100 rounded-xl shadow flex items-center justify-center text-2xl"
+        >⬆️</motion.button>
+        <div className="flex gap-1">
+          <motion.button whileTap={{ scale: 0.85 }}
+            onTouchStart={() => setMove(-1, 0)} onTouchEnd={() => setMove(0, 0)}
+            onMouseDown={() => setMove(-1, 0)} onMouseUp={() => setMove(0, 0)}
+            className="w-14 h-14 bg-amber-100 rounded-xl shadow flex items-center justify-center text-2xl"
+          >⬅️</motion.button>
+          <div className="w-14 h-14 bg-amber-50 rounded-xl flex items-center justify-center opacity-50">
+            <div className="w-3 h-3 bg-amber-300 rounded-full" />
           </div>
-          <div className="flex gap-3 justify-center">
-            <motion.button
-              whileTap={{ scale:0.86 }}
-              onPointerDown={() => move('left')}
-              className="flex-1 max-w-[110px] h-16 rounded-2xl font-black text-white shadow-lg flex items-center justify-center active:brightness-110"
-              style={{ background:'linear-gradient(135deg,#16a34a,#22c55e)' }}
-            >
-              <ChevronLeft className="w-8 h-8" />
-            </motion.button>
-
-            <div className="flex flex-col items-center justify-center text-xs text-muted-foreground w-14 gap-0.5">
-              <span className="text-xl">⚽</span>
-              <span className="leading-tight text-center">mover</span>
-            </div>
-
-            <motion.button
-              whileTap={{ scale:0.86 }}
-              onPointerDown={() => move('right')}
-              className="flex-1 max-w-[110px] h-16 rounded-2xl font-black text-white shadow-lg flex items-center justify-center active:brightness-110"
-              style={{ background:'linear-gradient(135deg,#16a34a,#22c55e)' }}
-            >
-              <ChevronRight className="w-8 h-8" />
-            </motion.button>
-          </div>
-          <p className="text-center text-xs text-muted-foreground pb-1">
-            Passe perto dos <strong>cones 🔶</strong> · Chegue à <strong>linha 🏁</strong> · Swipe também funciona
-          </p>
+          <motion.button whileTap={{ scale: 0.85 }}
+            onTouchStart={() => setMove(1, 0)} onTouchEnd={() => setMove(0, 0)}
+            onMouseDown={() => setMove(1, 0)} onMouseUp={() => setMove(0, 0)}
+            className="w-14 h-14 bg-amber-100 rounded-xl shadow flex items-center justify-center text-2xl"
+          >➡️</motion.button>
         </div>
-      )}
+        <motion.button whileTap={{ scale: 0.85 }}
+          onTouchStart={() => setMove(0, 1)} onTouchEnd={() => setMove(0, 0)}
+          onMouseDown={() => setMove(0, 1)} onMouseUp={() => setMove(0, 0)}
+          className="w-14 h-14 bg-amber-100 rounded-xl shadow flex items-center justify-center text-2xl"
+        >⬇️</motion.button>
+      </div>
 
-      <StickerToast />
+      <motion.button whileTap={{ scale: 0.9 }}
+        onClick={() => { setScore(0); setLives(3); initLevel(0); }}
+        className="flex items-center gap-2 text-gray-400 text-sm"
+      >
+        <RotateCcw className="w-4 h-4" /> Recomeçar
+      </motion.button>
     </div>
   );
 }
