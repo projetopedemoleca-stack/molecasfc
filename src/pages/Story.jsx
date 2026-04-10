@@ -5,8 +5,6 @@ import { ArrowLeft, Lock, CheckCircle2 } from 'lucide-react';
 import { TEAMS } from '@/lib/gameData';
 import { audio } from '@/lib/audioEngine';
 import ChapterQuiz from '@/components/story/ChapterQuiz';
-import { drawSticker, addSticker } from '@/lib/albumSystem.js';
-import { useStickerToast } from '@/components/ui/StickerEarnedToast.jsx';
 
 // ────────────────────────────────────────────────────────────────
 // Chapters

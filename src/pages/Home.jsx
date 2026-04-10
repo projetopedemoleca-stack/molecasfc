@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Trophy, BookOpen, User, Star, Sparkles, Gift } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Play, Trophy, BookOpen, User, Star } from 'lucide-react';
 import PlayerAvatar from '@/components/game/PlayerAvatar';
 import { PLAYERS } from '@/lib/gameData';
 import { loadProfile } from '@/lib/playerProfile';
-import { useStickerAlbum } from '@/hooks/useStickerAlbum.js';
 
 const menuItems = [
   {
@@ -49,15 +48,6 @@ const menuItems = [
     emoji: '🏅',
   },
   {
-    id: 'album',
-    icon: Sparkles,
-    label: 'Álbum de Figurinhas',
-    desc: 'Colecione itens fofos e mágicos',
-    color: 'from-pink-500 to-rose-400',
-    emoji: '💎',
-    isAlbum: true,
-  },
-  {
     to: '/about',
     icon: Star,
     label: 'Sobre Nós',
@@ -67,70 +57,12 @@ const menuItems = [
   },
 ];
 
-// Botão de teste para ganhar figurinhas (remover em produção)
-function TestStickerButton({ onEarn }) {
-  const [showOptions, setShowOptions] = useState(false);
-
-  return (
-    <div className="relative">
-      <motion.button
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-        onClick={() => setShowOptions(!showOptions)}
-        className="w-full py-2 rounded-xl font-bold bg-gradient-to-r from-amber-400 to-orange-500
-                   text-white shadow-lg flex items-center justify-center gap-2"
-      >
-        <Gift className="w-5 h-5" />
-        🎁 Ganhar Figurinha (Teste)
-      </motion.button>
-
-      <AnimatePresence>
-        {showOptions && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-xl shadow-xl 
-                       p-2 space-y-1 z-10"
-          >
-            {[
-              { id: undefined, label: 'Aleatória', color: 'bg-gray-500' },
-              { id: 'common', label: 'Comum', color: 'bg-gray-400' },
-              { id: 'rare', label: 'Rara', color: 'bg-blue-500' },
-              { id: 'epic', label: 'Épica', color: 'bg-purple-500' },
-              { id: 'legendary', label: 'Lendária', color: 'bg-amber-500' },
-            ].map((option) => (
-              <button
-                key={option.label}
-                onClick={() => {
-                  onEarn(option.id);
-                  setShowOptions(false);
-                }}
-                className={`w-full py-2 rounded-lg text-white font-semibold ${option.color}
-                           hover:opacity-90 transition-opacity`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
 export default function Home() {
   const profile = loadProfile();
   const selectedPlayer = PLAYERS.find(p => p.id === (profile.selectedPlayerId || 'luna')) || PLAYERS[0];
   const uniformColor = profile.uniformColor || '#E91E63';
-  const shortsColor = profile.shortsColor || '#000000';
-  const bootsColor = profile.bootsColor || '#FFD600';
-
-  const {
-    progress,
-    newStickersCount,
-    earnSticker,
-  } = useStickerAlbum();
+  const shortsColor  = profile.shortsColor  || '#000000';
+  const bootsColor   = profile.bootsColor   || '#FFD600';
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary/30 via-background to-accent/10 flex flex-col items-center px-4 pt-10 pb-8 font-body overflow-x-hidden">
@@ -174,109 +106,43 @@ export default function Home() {
         >
           <div className="absolute inset-0 rounded-full blur-2xl opacity-30" style={{ background: uniformColor }}/>
           <div className="relative bg-gradient-to-b from-primary/15 to-accent/15 rounded-3xl p-3 shadow-xl border border-white/20 flex items-center justify-center">
-            <PlayerAvatar player={selectedPlayer} uniformColor={uniformColor} shortsColor={shortsColor} bootsColor={bootsColor} size="lg" />
+            <PlayerAvatar
+              player={selectedPlayer}
+              uniformColor={uniformColor}
+              shortsColor={shortsColor}
+              bootsColor={bootsColor}
+              size="lg"
+            />
           </div>
         </motion.div>
-        <p className="text-xs text-muted-foreground mt-1 font-semibold">{selectedPlayer.name} · {selectedPlayer.position}</p>
+        <p className="text-xs text-muted-foreground mt-1 font-semibold">
+          {selectedPlayer.name} · {selectedPlayer.position}
+        </p>
       </motion.div>
 
-      {/* Progresso do Álbum (quick view) */}
-      {progress.obtained > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-sm mb-3"
-        >
-          <Link to="/sticker-album">
-            <div className="w-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 
-                       rounded-2xl p-3 text-white shadow-lg flex items-center gap-3 cursor-pointer">
-              <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center text-2xl">
-                💎
-              </div>
-              <div className="flex-1 text-left">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold">Álbum de Figurinhas</span>
-                  {newStickersCount > 0 && (
-                    <span className="bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-0.5 rounded-full">
-                      {newStickersCount} nova{newStickersCount > 1 ? 's' : ''}!
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 mt-1">
-                  <div className="flex-1 h-2 bg-black/20 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-yellow-300 rounded-full transition-all"
-                      style={{ width: `${progress.percentage}%` }}
-                    />
-                  </div>
-                  <span className="text-sm font-bold">{progress.percentage}%</span>
-                </div>
-              </div>
-              <span className="text-xl">›</span>
-            </div>
-          </Link>
-        </motion.div>
-      )}
-
-      {/* Menu cards / Album view */}
+      {/* Menu cards */}
       <div className="w-full max-w-sm space-y-3">
         {menuItems.map((item, i) => (
           <motion.div
-            key={item.to || item.id}
+            key={item.to}
             initial={{ x: -60, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ delay: 0.3 + i * 0.1 }}
           >
-            {item.isAlbum ? (
-              <Link to="/sticker-album">
-                <div className="bg-card rounded-2xl shadow-lg border border-border/30 flex items-center gap-4 overflow-hidden active:scale-95 transition-transform relative">
-                  <div className={`bg-gradient-to-b ${item.color} w-16 h-16 flex-shrink-0 flex items-center justify-center text-3xl`}>
-                    {item.emoji}
-                  </div>
-                  <div className="flex-1 py-3 pr-3 text-left">
-                    <div className="flex items-center gap-2">
-                      <p className="font-heading font-bold text-base text-foreground leading-tight">{item.label}</p>
-                      {newStickersCount > 0 && (
-                        <span className="bg-pink-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                          {newStickersCount}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-muted-foreground text-xs mt-0.5">{item.desc}</p>
-                    {progress.obtained > 0 && (
-                      <p className="text-xs text-pink-500 font-semibold mt-0.5">
-                        {progress.obtained}/{progress.total} figurinhas
-                      </p>
-                    )}
-                  </div>
-                  <span className="pr-4 text-muted-foreground text-xl">›</span>
+            <Link to={item.to}>
+              <div className="bg-card rounded-2xl shadow-lg border border-border/30 flex items-center gap-4 overflow-hidden active:scale-95 transition-transform">
+                <div className={`bg-gradient-to-b ${item.color} w-16 h-16 flex-shrink-0 flex items-center justify-center text-3xl`}>
+                  {item.emoji}
                 </div>
-              </Link>
-            ) : (
-              <Link to={item.to}>
-                <div className="bg-card rounded-2xl shadow-lg border border-border/30 flex items-center gap-4 overflow-hidden active:scale-95 transition-transform">
-                  <div className={`bg-gradient-to-b ${item.color} w-16 h-16 flex-shrink-0 flex items-center justify-center text-3xl`}>
-                    {item.emoji}
-                  </div>
-                  <div className="flex-1 py-3 pr-3">
-                    <p className="font-heading font-bold text-base text-foreground leading-tight">{item.label}</p>
-                    <p className="text-muted-foreground text-xs mt-0.5">{item.desc}</p>
-                  </div>
-                  <span className="pr-4 text-muted-foreground text-xl">›</span>
+                <div className="flex-1 py-3 pr-3">
+                  <p className="font-heading font-bold text-base text-foreground leading-tight">{item.label}</p>
+                  <p className="text-muted-foreground text-xs mt-0.5">{item.desc}</p>
                 </div>
-              </Link>
-            )}
+                <span className="pr-4 text-muted-foreground text-xl">›</span>
+              </div>
+            </Link>
           </motion.div>
         ))}
-
-        {/* Botão de teste - remover em produção */}
-        <motion.div
-          initial={{ x: -60, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ delay: 0.3 + menuItems.length * 0.1 }}
-        >
-          <TestStickerButton onEarn={(rarity) => earnSticker('test', rarity)} />
-        </motion.div>
       </div>
 
       {/* Values strip */}

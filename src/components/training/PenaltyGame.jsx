@@ -5,8 +5,6 @@ import { PLAYERS } from '@/lib/gameData';
 import { loadProfile } from '@/lib/playerProfile';
 import { bgMusic } from '@/lib/trainingMusic';
 import { LevelBadge } from './TrainingHelpers';
-import { drawSticker, addSticker } from '@/lib/albumSystem.js';
-import { useStickerToast } from '@/components/ui/StickerEarnedToast.jsx';
 
 // 9 quadrantes do gol: linha 0=topo, 1=meio, 2=baixo | col 0=esq, 1=centro, 2=dir
 const QUADS = [

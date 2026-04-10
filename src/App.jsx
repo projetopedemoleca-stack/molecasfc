@@ -16,7 +16,6 @@ import CharacterSelect from '@/pages/CharacterSelect';
 import Profile from '@/pages/Profile';
 import Training from '@/pages/Training';
 import About from '@/pages/About';
-import StickerAlbum from '@/pages/StickerAlbum';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -54,7 +53,7 @@ const AuthenticatedApp = () => {
       <Route path="/character-select" element={<CharacterSelect />} />
       <Route path="/profile" element={<Profile />} />
       <Route path="/training" element={<Training />} />
-      <Route path="/sticker-album" element={<StickerAlbum />} />
+
       <Route path="/about" element={<About />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
