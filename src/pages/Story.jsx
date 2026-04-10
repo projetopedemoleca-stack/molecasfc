@@ -165,11 +165,6 @@ export default function Story() {
       persistProgress(updated);
       return updated;
     });
-    // Ganhar figurinha ao completar capítulo
-    const rarity = id >= 10 ? 'epic' : id >= 7 ? 'rare' : id >= 4 ? 'uncommon' : null;
-    const def = drawSticker('story', rarity);
-    const result = addSticker(def.id, 'story', true);
-    if (result) showToast({ ...result, definition: def });
   };
 
   const handleChapterClick = (ch) => {
@@ -420,7 +415,6 @@ export default function Story() {
           </motion.div>
         )}
       </AnimatePresence>
-      <StickerToast />
     </div>
   );
 }
