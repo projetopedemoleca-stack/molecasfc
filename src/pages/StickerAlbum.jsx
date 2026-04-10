@@ -9,20 +9,50 @@ import {
 import { ALL_STICKERS, RARITY, CATEGORIES, ALBUM_PAGES } from '@/lib/stickersData.js';
 import { PlayerAvatar, FlagBadge } from '@/components/ui/PlayerAvatar.jsx';
 
+// ── Ícones de futebol SVG simples ────────────────────────────────────────────
+function FootballIcon({ icon, size = 52 }) {
+  const s = size;
+  const icons = {
+    BALL_GOLD:    <svg viewBox="0 0 64 64" width={s} height={s}><circle cx="32" cy="32" r="28" fill="#f59e0b" stroke="#d97706" strokeWidth="2"/><polygon points="32,10 38,22 50,22 41,30 44,43 32,36 20,43 23,30 14,22 26,22" fill="#7c3aed"/></svg>,
+    TROPHY:       <svg viewBox="0 0 64 64" width={s} height={s}><path d="M16 8h32v20c0 11-8 18-16 18s-16-7-16-18z" fill="#fbbf24" stroke="#d97706" strokeWidth="2"/><rect x="28" y="46" width="8" height="10" fill="#d97706"/><rect x="20" y="56" width="24" height="4" rx="2" fill="#fbbf24"/></svg>,
+    BOOT_GOLD:    <svg viewBox="0 0 64 64" width={s} height={s}><path d="M12 40 Q14 20 28 18 L48 22 L50 30 L32 30 L26 46 L14 46z" fill="#fbbf24" stroke="#d97706" strokeWidth="2"/><circle cx="42" cy="42" r="8" fill="#d97706"/></svg>,
+    GLOVE_GOLD:   <svg viewBox="0 0 64 64" width={s} height={s}><path d="M20 48 L18 24 Q18 14 26 14 L30 14 L30 22 L34 14 Q38 10 42 14 L40 22 L44 18 Q48 16 50 20 L46 28 L50 26 Q54 28 52 34 L46 48z" fill="#fbbf24" stroke="#d97706" strokeWidth="2"/></svg>,
+    TROPHY_GOAL:  <svg viewBox="0 0 64 64" width={s} height={s}><path d="M18 8h28v18c0 9-6 15-14 15s-14-6-14-15z" fill="#ef4444" stroke="#dc2626" strokeWidth="2"/><rect x="29" y="41" width="6" height="8" fill="#dc2626"/><rect x="22" y="49" width="20" height="4" rx="2" fill="#ef4444"/><circle cx="32" cy="22" r="6" fill="#fff" opacity="0.5"/></svg>,
+    MEDAL_GOLD:   <svg viewBox="0 0 64 64" width={s} height={s}><rect x="26" y="4" width="12" height="18" rx="3" fill="#fbbf24"/><circle cx="32" cy="42" r="18" fill="#fbbf24" stroke="#d97706" strokeWidth="2"/><text x="32" y="48" textAnchor="middle" fontSize="16" fill="#7c3aed" fontWeight="bold">1</text></svg>,
+    MEDAL_SILVER: <svg viewBox="0 0 64 64" width={s} height={s}><rect x="26" y="4" width="12" height="18" rx="3" fill="#9ca3af"/><circle cx="32" cy="42" r="18" fill="#9ca3af" stroke="#6b7280" strokeWidth="2"/><text x="32" y="48" textAnchor="middle" fontSize="16" fill="white" fontWeight="bold">2</text></svg>,
+    MEDAL_BRONZE: <svg viewBox="0 0 64 64" width={s} height={s}><rect x="26" y="4" width="12" height="18" rx="3" fill="#b45309"/><circle cx="32" cy="42" r="18" fill="#b45309" stroke="#92400e" strokeWidth="2"/><text x="32" y="48" textAnchor="middle" fontSize="16" fill="white" fontWeight="bold">3</text></svg>,
+    WHISTLE:      <svg viewBox="0 0 64 64" width={s} height={s}><path d="M8 24 Q8 16 16 16 L40 20 L48 28 L40 36 L16 36 Q8 36 8 24z" fill="#f59e0b" stroke="#d97706" strokeWidth="2"/><rect x="40" y="22" width="16" height="12" rx="4" fill="#ef4444"/></svg>,
+    NET:          <svg viewBox="0 0 64 64" width={s} height={s}><rect x="8" y="8" width="48" height="36" rx="4" fill="none" stroke="#3b82f6" strokeWidth="2"/>{[0,1,2,3].map(i=><line key={i} x1={8+i*16} y1="8" x2={8+i*16} y2="44" stroke="#3b82f6" strokeWidth="1.5"/>)}{[0,1,2,3].map(i=><line key={i} x1="8" y1={8+i*12} x2="56" y2={8+i*12} stroke="#3b82f6" strokeWidth="1.5"/>)}<path d="M8 44 Q32 56 56 44" fill="#3b82f6" opacity="0.3"/></svg>,
+    JERSEY_10:    <svg viewBox="0 0 64 64" width={s} height={s}><path d="M14 16 L8 24 L18 28 L18 56 L46 56 L46 28 L56 24 L50 16 L38 22 Q32 18 26 22z" fill="#22c55e" stroke="#15803d" strokeWidth="2"/><text x="32" y="46" textAnchor="middle" fontSize="18" fill="white" fontWeight="bold">10</text></svg>,
+    ARMBAND:      <svg viewBox="0 0 64 64" width={s} height={s}><ellipse cx="32" cy="32" rx="22" ry="12" fill="#fbbf24" stroke="#d97706" strokeWidth="2"/><text x="32" y="37" textAnchor="middle" fontSize="11" fill="#7c3aed" fontWeight="bold">CAP</text></svg>,
+    CORNER_FLAG:  <svg viewBox="0 0 64 64" width={s} height={s}><line x1="16" y1="56" x2="16" y2="8" stroke="#dc2626" strokeWidth="3" strokeLinecap="round"/><polygon points="16,8 48,16 16,28" fill="#ef4444"/></svg>,
+    VAR_SCREEN:   <svg viewBox="0 0 64 64" width={s} height={s}><rect x="8" y="12" width="48" height="32" rx="4" fill="#1e293b" stroke="#3b82f6" strokeWidth="2"/><text x="32" y="33" textAnchor="middle" fontSize="14" fill="#60a5fa" fontWeight="bold">VAR</text><rect x="24" y="44" width="16" height="8" rx="2" fill="#1e293b"/></svg>,
+    SHIELD:       <svg viewBox="0 0 64 64" width={s} height={s}><path d="M32 6 L54 16 L54 32 Q54 50 32 58 Q10 50 10 32 L10 16z" fill="#7c3aed" stroke="#5b21b6" strokeWidth="2"/><path d="M32 14 L46 22 L46 32 Q46 44 32 50 Q18 44 18 32 L18 22z" fill="#a855f7" opacity="0.5"/></svg>,
+    CARD_RED:     <svg viewBox="0 0 64 64" width={s} height={s}><rect x="14" y="8" width="36" height="48" rx="4" fill="#ef4444" stroke="#dc2626" strokeWidth="2"/></svg>,
+    CARD_YELLOW:  <svg viewBox="0 0 64 64" width={s} height={s}><rect x="14" y="8" width="36" height="48" rx="4" fill="#fbbf24" stroke="#d97706" strokeWidth="2"/></svg>,
+    SUBSTITUTION: <svg viewBox="0 0 64 64" width={s} height={s}><circle cx="32" cy="32" r="26" fill="#f0fdf4" stroke="#22c55e" strokeWidth="2"/><path d="M20 24 L32 16 L44 24" fill="none" stroke="#22c55e" strokeWidth="3" strokeLinecap="round"/><path d="M44 40 L32 48 L20 40" fill="none" stroke="#ef4444" strokeWidth="3" strokeLinecap="round"/><line x1="32" y1="16" x2="32" y2="48" stroke="#374151" strokeWidth="1.5"/></svg>,
+    BOOT_CLEAT:   <svg viewBox="0 0 64 64" width={s} height={s}><path d="M14 44 Q16 20 30 18 L50 22 L52 32 L34 32 L28 50 L16 50z" fill="#1e293b" stroke="#374151" strokeWidth="2"/>{[0,1,2,3].map(i=><rect key={i} x={26+i*7} y="50" width="4" height="6" rx="2" fill="#64748b"/>)}</svg>,
+    SHIN_GUARD:   <svg viewBox="0 0 64 64" width={s} height={s}><rect x="20" y="8" width="24" height="44" rx="10" fill="#3b82f6" stroke="#2563eb" strokeWidth="2"/><rect x="24" y="14" width="16" height="6" rx="3" fill="#93c5fd"/><rect x="24" y="24" width="16" height="4" rx="2" fill="#93c5fd" opacity="0.6"/></svg>,
+  };
+  return icons[icon] || <svg viewBox="0 0 64 64" width={s} height={s}><circle cx="32" cy="32" r="28" fill="#6d28d9"/><text x="32" y="40" textAnchor="middle" fontSize="24" fill="white">?</text></svg>;
+}
+
 // ── Helper: decide que visual usar no card ────────────────────────────────────
 function StickerVisual({ sticker, size = 52, blur = false }) {
   const wrap = { display: 'flex', alignItems: 'center', justifyContent: 'center', height: size + 10 };
   if (blur) {
-    return <div style={wrap}><span style={{ fontSize: size * 0.65, filter: 'blur(4px)', opacity: 0.4 }}>❓</span></div>;
+    return <div style={wrap}><span style={{ fontSize: size * 0.65, filter: 'blur(4px)', opacity: 0.4 }}>?</span></div>;
   }
   if (sticker.category === 'national') {
-    return <div style={wrap}><FlagBadge country={sticker.country} size={size} /></div>;
+    return <div style={wrap}><FlagBadge flag={sticker.flag} size={size} /></div>;
   }
-  if (sticker.category === 'brazil' || sticker.category === 'world') {
+  if (sticker.category === 'brazil' || sticker.category === 'world' || sticker.category === 'skills') {
     return <div style={wrap}><PlayerAvatar sticker={sticker} size={size} /></div>;
   }
-  // icons / skills — mantém emoji
-  return <div style={wrap}><span style={{ fontSize: size * 0.7 }}>{sticker.emoji}</span></div>;
+  if (sticker.category === 'icons') {
+    return <div style={wrap}><FootballIcon icon={sticker.icon} size={size} /></div>;
+  }
+  return <div style={wrap}><span style={{ fontSize: size * 0.7 }}>?</span></div>;
 }
 
 // ── Cor por raridade ──────────────────────────────────────────────────────────
@@ -270,7 +300,7 @@ function StickerDetailModal({ sticker, userSticker, onClose, onPaste, onGenerate
         {/* Nome e info */}
         <h3 className={`font-heading font-black text-xl ${style.text}`}>{sticker.name}</h3>
         {sticker.position && <p className="text-gray-500 text-sm">{sticker.position}</p>}
-        {sticker.country && <p className="text-gray-500 text-xs">{sticker.country}</p>}
+        {(sticker.country || sticker.flag) && <p className="text-gray-500 text-xs">{sticker.flag || sticker.country}</p>}
         <p className="text-gray-600 text-sm mt-2 italic">{sticker.description}</p>
 
         {/* Categoria */}
@@ -341,7 +371,7 @@ function TradeCodeModal({ code, sticker, onClose }) {
         <div className="text-5xl mb-2">🎁</div>
         <h3 className="font-heading font-black text-xl mb-1">Código de Troca!</h3>
         <p className="text-gray-500 text-sm mb-4">
-          Envie este código para a sua amiga trocar {sticker.emoji} {sticker.name}
+          Envie este código para a sua amiga trocar {sticker.name}
         </p>
 
         <div className="bg-gray-100 rounded-xl p-3 mb-4 font-mono font-bold text-lg tracking-widest text-gray-800">
@@ -419,7 +449,7 @@ function RedeemModal({ onClose }) {
         ) : result.success ? (
           <div className="text-center">
             <div className="text-6xl mb-2">
-              {result.sticker?.definition?.emoji || result.stickers?.[0]?.definition?.emoji || '🎉'}
+              {'\uD83C\uDF89'}
             </div>
             <p className="text-green-600 font-bold text-lg">{result.message || 'Figurinhas resgatadas!'}</p>
             <motion.button

@@ -222,7 +222,7 @@ export function generateTradeCode(uniqueId) {
     stickerId: sticker.id,
     uniqueId: uniqueId,
     stickerName: ALL_STICKERS.find(s => s.id === sticker.id)?.name,
-    stickerEmoji: ALL_STICKERS.find(s => s.id === sticker.id)?.emoji,
+    stickerCategory: ALL_STICKERS.find(s => s.id === sticker.id)?.category,
     stickerRarity: sticker.rarity,
     createdAt: new Date().toISOString(),
     redeemed: false
@@ -288,7 +288,7 @@ export function redeemTradeCode(code) {
   return { 
     success: true, 
     sticker: result,
-    message: `Você recebeu: ${trade.stickerEmoji} ${trade.stickerName}!`
+    message: `Você recebeu: ${trade.stickerName}!`
   };
 }
 

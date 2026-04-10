@@ -253,7 +253,7 @@ export function earnGoldenSticker(sticker) {
   const already = (profile.goldenStickers || []).find(g => g.id === sticker.id);
   if (already) return { profile, code: already.code, isNew: false };
   const code = genCode(sticker.id + Date.now());
-  const gs = { id: sticker.id, code, name: sticker.name, emoji: sticker.emoji, earnedAt: new Date().toLocaleDateString('pt-BR') };
+  const gs = { id: sticker.id, code, name: sticker.name, category: sticker.category, earnedAt: new Date().toLocaleDateString('pt-BR') };
   const goldenStickers = [...(profile.goldenStickers || []), gs];
   const newProfile = updateProfile({ goldenStickers });
   return { profile: newProfile, code, isNew: true };

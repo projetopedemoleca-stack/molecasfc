@@ -446,7 +446,7 @@ export function donateSticker(uniqueId) {
   globalTrades[transferCode] = {
     stickerId: sticker.id,
     stickerName: sticker.name,
-    stickerEmoji: sticker.emoji,
+    stickerAvatar: sticker.avatar || sticker.flag || sticker.icon || '',
     stickerRarity: sticker.rarity,
     stickerCategory: sticker.category,
     stickerDescription: sticker.description,

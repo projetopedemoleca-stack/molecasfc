@@ -465,7 +465,49 @@ function FlagSVG({ country, width, height }) {
   return flag;
 }
 
-export function FlagBadge({ country, size = 48 }) {
+// Bandeiras adicionais
+function ExtraFlagSVG({ country, width, height }) {
+  const flags = {
+    // Americas
+    PY: <svg width={width} height={height} viewBox="0 0 3 2"><rect width="3" height="2" fill="#D52B1E"/><rect y="0.5" width="3" height="1" fill="white"/><rect y="1.5" width="3" height="0.5" fill="#0038A8"/></svg>,
+    EC: <svg width={width} height={height} viewBox="0 0 3 2"><rect width="3" height="2" fill="#0038A8"/><rect width="3" height="0.67" fill="#FFD100"/><rect y="0.67" width="3" height="0.67" fill="#D52B1E"/></svg>,
+    VE: <svg width={width} height={height} viewBox="0 0 3 2"><rect width="3" height="2" fill="#CF142B"/><rect width="3" height="0.67" fill="#002FA7"/><rect y="1.33" width="3" height="0.67" fill="#FCB424"/></svg>,
+    PE: <svg width={width} height={height} viewBox="0 0 3 2"><rect width="3" height="2" fill="white"/><rect width="1" height="2" fill="#D91023"/><rect x="2" width="1" height="2" fill="#D91023"/></svg>,
+    BO: <svg width={width} height={height} viewBox="0 0 3 2"><rect width="3" height="2" fill="#007934"/><rect width="3" height="0.67" fill="#D52B1E"/><rect y="0.67" width="3" height="0.67" fill="#F7D117"/></svg>,
+    CA: <svg width={width} height={height} viewBox="0 0 3 2"><rect width="3" height="2" fill="white"/><rect width="0.75" height="2" fill="#FF0000"/><rect x="2.25" width="0.75" height="2" fill="#FF0000"/><polygon points="1.5,0.4 1.6,0.75 1.95,0.75 1.68,0.95 1.78,1.3 1.5,1.1 1.22,1.3 1.32,0.95 1.05,0.75 1.4,0.75" fill="#FF0000"/></svg>,
+    MX: <svg width={width} height={height} viewBox="0 0 3 2"><rect width="3" height="2" fill="#CE1126"/><rect width="2" height="2" fill="white"/><rect width="1" height="2" fill="#006847"/><circle cx="1.5" cy="1" r="0.22" fill="#006847" opacity="0.6"/></svg>,
+    // Europa extra
+    'GB-ENG': <svg width={width} height={height} viewBox="0 0 3 2"><rect width="3" height="2" fill="white"/><rect x="1.3" width="0.4" height="2" fill="#CF091B"/><rect y="0.8" width="3" height="0.4" fill="#CF091B"/></svg>,
+    'GB-SCT': <svg width={width} height={height} viewBox="0 0 3 2"><rect width="3" height="2" fill="#003087"/><line x1="0" y1="0" x2="3" y2="2" stroke="white" strokeWidth="0.4"/><line x1="3" y1="0" x2="0" y2="2" stroke="white" strokeWidth="0.4"/></svg>,
+    'GB-WLS': <svg width={width} height={height} viewBox="0 0 3 2"><rect width="3" height="2" fill="white"/><rect y="1" width="3" height="1" fill="#00AB39"/><ellipse cx="1.5" cy="1" rx="0.6" ry="0.85" fill="#CF091B"/></svg>,
+    CH: <svg width={width} height={height} viewBox="0 0 3 2"><rect width="3" height="2" fill="#FF0000"/><rect x="1.25" y="0.4" width="0.5" height="1.2" fill="white"/><rect x="0.9" y="0.75" width="1.2" height="0.5" fill="white"/></svg>,
+    RU: <svg width={width} height={height} viewBox="0 0 3 2"><rect width="3" height="2" fill="#D52B1E"/><rect width="3" height="0.67" fill="white"/><rect y="0.67" width="3" height="0.67" fill="#003087"/></svg>,
+    IS: <svg width={width} height={height} viewBox="0 0 25 18"><rect width="25" height="18" fill="#003897"/><rect x="7" width="4" height="18" fill="white"/><rect y="7" width="25" height="4" fill="white"/><rect x="8" width="2" height="18" fill="#D72828"/><rect y="8" width="25" height="2" fill="#D72828"/></svg>,
+    // Asia/Oceania extra
+    NZ: <svg width={width} height={height} viewBox="0 0 6 3"><rect width="6" height="3" fill="#00247D"/><path d="M0,0 L3,1.5 M3,0 L0,1.5" stroke="white" strokeWidth="0.4"/><path d="M0,0 L3,1.5 M3,0 L0,1.5" stroke="#C8102E" strokeWidth="0.25"/><rect x="1.25" width="0.5" height="1.5" fill="white"/><rect y="0.5" x="0" width="3" height="0.5" fill="white"/><rect x="1.33" width="0.33" height="1.5" fill="#C8102E"/><rect y="0.58" width="3" height="0.33" fill="#C8102E"/><polygon points="4.4,0.3 4.5,0.6 4.8,0.6 4.55,0.78 4.65,1.08 4.4,0.9 4.15,1.08 4.25,0.78 4,0.6 4.3,0.6" fill="red"/></svg>,
+    TH: <svg width={width} height={height} viewBox="0 0 3 2"><rect width="3" height="2" fill="white"/><rect y="0.33" width="3" height="0.45" fill="#A51931"/><rect y="1.22" width="3" height="0.45" fill="#A51931"/><rect y="0.78" width="3" height="0.44" fill="#2D2A4A"/></svg>,
+    VN: <svg width={width} height={height} viewBox="0 0 3 2"><rect width="3" height="2" fill="#DA251D"/><polygon points="1.5,0.4 1.63,0.78 2.02,0.78 1.7,1.0 1.83,1.38 1.5,1.16 1.17,1.38 1.3,1.0 0.98,0.78 1.37,0.78" fill="#FFFF00"/></svg>,
+    IN: <svg width={width} height={height} viewBox="0 0 3 2"><rect width="3" height="2" fill="#138808"/><rect width="3" height="0.67" fill="#FF9933"/><rect y="0.67" width="3" height="0.66" fill="white"/><circle cx="1.5" cy="1" r="0.25" fill="none" stroke="#000080" strokeWidth="0.05"/></svg>,
+    // Africa extra
+    CM: <svg width={width} height={height} viewBox="0 0 3 2"><rect width="3" height="2" fill="#CE1126"/><rect width="2" height="2" fill="#007A5E"/><rect width="1" height="2" fill="#007A5E"/><polygon points="1.5,0.5 1.62,0.87 2.0,0.87 1.69,1.1 1.81,1.47 1.5,1.25 1.19,1.47 1.31,1.1 1.0,0.87 1.38,0.87" fill="#CE1126"/><rect x="1" width="1" height="2" fill="white"/></svg>,
+    ZM: <svg width={width} height={height} viewBox="0 0 3 2"><rect width="3" height="2" fill="#198A00"/><rect x="2.1" width="0.3" height="2" fill="#000"/><rect x="2.4" width="0.3" height="2" fill="#EF7D00"/><rect x="2.7" width="0.3" height="2" fill="#EF0000"/></svg>,
+    CI: <svg width={width} height={height} viewBox="0 0 3 2"><rect width="3" height="2" fill="#009A00"/><rect width="2" height="2" fill="white"/><rect width="1" height="2" fill="#FF8200"/></svg>,
+    TN: <svg width={width} height={height} viewBox="0 0 3 2"><rect width="3" height="2" fill="#E70013"/><circle cx="1.4" cy="1" r="0.5" fill="white"/><circle cx="1.45" cy="1" r="0.38" fill="#E70013"/><path d="M 1.45 0.72 A 0.28 0.28 0 1 1 1.44 0.72" fill="none" stroke="white" strokeWidth="0.05"/><polygon points="1.75,1 1.82,1.2 1.6,1.08 1.6,0.92 1.82,0.8" fill="white"/></svg>,
+    KE: <svg width={width} height={height} viewBox="0 0 3 2"><rect width="3" height="2" fill="#006600"/><rect y="0.6" width="3" height="0.8" fill="black"/><rect y="0.7" width="3" height="0.2" fill="white"/><rect y="1.1" width="3" height="0.2" fill="white"/><polygon points="1.5,0.3 1.7,1 1.5,1.7 1.3,1 " fill="#BB0000"/></svg>,
+  };
+  return flags[country] || null;
+}
+
+function AnyFlagSVG({ code, width, height }) {
+  // Extra flags dictionary takes priority
+  const extraResult = ExtraFlagSVG({ country: code, width, height });
+  if (extraResult) return extraResult;
+  // Fall back to original FlagSVG dictionary
+  return <FlagSVG country={code} width={width} height={height} />;
+}
+
+export function FlagBadge({ flag, country, size = 48 }) {
+  const code = flag || country || 'BR';
   const h = Math.round(size * 0.67);
   return (
     <div style={{
@@ -475,7 +517,7 @@ export function FlagBadge({ country, size = 48 }) {
       display: 'inline-block',
       boxShadow: '0 1px 5px rgba(0,0,0,0.22)',
     }}>
-      <FlagSVG country={country} width={size} height={h} />
+      <AnyFlagSVG code={code} width={size} height={h} />
     </div>
   );
 }
