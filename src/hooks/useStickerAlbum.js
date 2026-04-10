@@ -1,182 +1,94 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  loadUnifiedAlbum,
-  saveUnifiedAlbum,
-  addStickerToAlbum,
+  loadAlbum,
+  saveAlbum,
+  addSticker,
   pasteSticker as pasteStickerLib,
-  redeemCode,
-  donateSticker,
-  redeemDonatedSticker,
-  drawRandomSticker,
-  earnMinigameSticker,
+  generateTradeCode,
+  redeemTradeCode,
+  redeemPromoCode,
+  drawSticker,
   calculateProgress,
-  getNewStickers,
   markAllAsSeen,
   getTradableStickers,
-  STICKERS_COLLECTION,
-  RARITY_CONFIG,
-} from '@/lib/unifiedStickers.js';
+} from '@/lib/albumSystem.js';
+import { ALL_STICKERS, RARITY } from '@/lib/stickersData.js';
 
 export function useStickerAlbum() {
-  const [album, setAlbum] = useState(loadUnifiedAlbum());
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [album, setAlbum] = useState(() => loadAlbum());
   const [lastReward, setLastReward] = useState(null);
   const [showRewardAnimation, setShowRewardAnimation] = useState(false);
 
-  useEffect(() => {
-    setAlbum(loadUnifiedAlbum());
-    setIsLoaded(true);
+  const refresh = useCallback(() => {
+    setAlbum(loadAlbum());
   }, []);
 
-  useEffect(() => {
-    if (isLoaded) {
-      saveUnifiedAlbum(album);
-    }
-  }, [album, isLoaded]);
-
-  const hasSticker = useCallback((stickerId) => {
-    return Object.values(album.stickers).some(s => s.id === stickerId);
-  }, [album.stickers]);
-
-  const isStickerPasted = useCallback((stickerId) => {
-    return Object.values(album.stickers).some(s => s.id === stickerId && s.isPasted);
-  }, [album.stickers]);
-
-  const getStickerQuantity = useCallback((stickerId) => {
-    return Object.values(album.stickers)
-      .filter(s => s.id === stickerId)
-      .reduce((sum, s) => sum + s.quantity, 0);
-  }, [album.stickers]);
-
-  const getUserSticker = useCallback((stickerId) => {
-    return Object.values(album.stickers).find(s => s.id === stickerId);
-  }, [album.stickers]);
-
-  const earnSticker = useCallback((source, preferredRarity) => {
-    const drawn = drawRandomSticker(preferredRarity);
-    const result = addStickerToAlbum(drawn.id, source, true);
-    
+  const earnSticker = useCallback((source = 'unknown', preferredRarity = null) => {
+    const stickerDef = drawSticker(source, preferredRarity);
+    const result = addSticker(stickerDef.id, source, true);
     if (result) {
-      setAlbum(loadUnifiedAlbum());
-      const reward = { sticker: result, isNew: result.quantity === 1 };
-      setLastReward(reward);
+      refresh();
+      setLastReward({ sticker: result, definition: stickerDef });
       setShowRewardAnimation(true);
-      return reward;
+      return result;
     }
     return null;
-  }, []);
-
-  const earnSpecificSticker = useCallback((stickerId, source = 'reward') => {
-    const result = addStickerToAlbum(stickerId, source, true);
-    
-    if (result) {
-      setAlbum(loadUnifiedAlbum());
-      const reward = { sticker: result, isNew: result.quantity === 1 };
-      setLastReward(reward);
-      setShowRewardAnimation(true);
-      return reward;
-    }
-    return null;
-  }, []);
-
-  const earnFromMinigame = useCallback((gameName, score) => {
-    const result = earnMinigameSticker(gameName, score);
-    
-    if (result) {
-      setAlbum(loadUnifiedAlbum());
-      const reward = { sticker: result, isNew: result.quantity === 1 };
-      setLastReward(reward);
-      setShowRewardAnimation(true);
-      return reward;
-    }
-    return null;
-  }, []);
+  }, [refresh]);
 
   const pasteSticker = useCallback((uniqueId) => {
-    const success = pasteStickerLib(uniqueId);
-    if (success) {
-      setAlbum(loadUnifiedAlbum());
-    }
-    return success;
-  }, []);
+    const result = pasteStickerLib(uniqueId);
+    if (result.success) refresh();
+    return result;
+  }, [refresh]);
 
   const useCode = useCallback((code) => {
-    const result = redeemCode(code);
-    if (result.success && result.stickers) {
-      setAlbum(loadUnifiedAlbum());
-      if (result.stickers.length > 0) {
-        setLastReward({ sticker: result.stickers[0], isNew: true });
+    let result = redeemTradeCode(code);
+    if (!result.success) result = redeemPromoCode(code);
+    if (result.success) {
+      refresh();
+      const sticker = result.sticker || result.stickers?.[0];
+      if (sticker) {
+        setLastReward({ sticker });
         setShowRewardAnimation(true);
       }
     }
     return result;
-  }, []);
+  }, [refresh]);
 
   const generateTrade = useCallback((uniqueId) => {
-    const result = donateSticker(uniqueId);
-    if (result.success) {
-      setAlbum(loadUnifiedAlbum());
-    }
+    const result = generateTradeCode(uniqueId);
+    if (result.success) refresh();
     return result;
-  }, []);
-
-  const useTradeCode = useCallback((code) => {
-    const result = redeemDonatedSticker(code);
-    if (result.success && result.sticker) {
-      setAlbum(loadUnifiedAlbum());
-      const reward = { sticker: result.sticker, isNew: true };
-      setLastReward(reward);
-      setShowRewardAnimation(true);
-    }
-    return result;
-  }, []);
-
-  const markAsSeen = useCallback((uniqueId) => {
-    const sticker = album.stickers[uniqueId];
-    if (sticker) {
-      sticker.isNew = false;
-      setAlbum({ ...album });
-    }
-  }, [album]);
+  }, [refresh]);
 
   const markAllStickersAsSeen = useCallback(() => {
     markAllAsSeen();
-    setAlbum(loadUnifiedAlbum());
-  }, []);
+    refresh();
+  }, [refresh]);
 
   const closeRewardAnimation = useCallback(() => {
     setShowRewardAnimation(false);
   }, []);
 
   const progress = calculateProgress();
-  const newStickersCount = getNewStickers().length;
+  const newStickersCount = Object.values(album.stickers).filter(s => s.isNew).length;
   const tradableStickers = getTradableStickers();
-  const userStickersList = Object.values(album.stickers);
 
   return {
     album,
-    userStickers: userStickersList,
-    isLoaded,
+    userStickers: Object.values(album.stickers),
     progress,
     lastReward,
     showRewardAnimation,
     newStickersCount,
     tradableStickers,
-    hasSticker,
-    isStickerPasted,
-    getStickerQuantity,
-    getUserSticker,
     earnSticker,
-    earnSpecificSticker,
-    earnFromMinigame,
     pasteSticker,
     useCode,
     generateTrade,
-    useTradeCode,
-    markAsSeen,
     markAllStickersAsSeen,
     closeRewardAnimation,
-    allStickers: STICKERS_COLLECTION,
-    rarityConfig: RARITY_CONFIG,
+    allStickers: ALL_STICKERS,
+    rarityConfig: RARITY,
   };
 }

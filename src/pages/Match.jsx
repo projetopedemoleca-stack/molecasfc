@@ -9,7 +9,7 @@ import { audio } from '@/lib/audioEngine';
 import { loadProfile, saveMatchResult, unlockScene, addWinXP } from '@/lib/playerProfile';
 import MatchSetupScreen from '@/components/game/MatchSetupScreen';
 import DailyChallengeCard, { getDailyChallengeStatus, getTodayChallenge, markChallengeCompleted } from '@/components/match/DailyChallengeCard';
-import { loadUnifiedAlbum, saveUnifiedAlbum, STICKERS_COLLECTION as STICKERS } from '@/lib/unifiedStickers.js';
+import { earnFromMatch } from '@/lib/albumSystem.js';
 
 // --- Toast de conquista ----------------------------------------
 function AchievementToast({ achievements, onDone }) {
@@ -1074,33 +1074,19 @@ export default function Match() {
       
       if (challengeMet) {
         markChallengeCompleted();
-        const album = loadUnifiedAlbum();
-        const collection = Object.values(album.stickers).map(s => s.id);
-        const reward = STICKERS.slice(0, 3).filter(s => !collection.includes(s.id));
-        // Adiciona as figurinhas ao álbum
-        reward.forEach(sticker => {
-          const stickerDef = STICKERS.find(s => s.id === sticker.id);
-          if (stickerDef) {
-            const uniqueId = `${stickerDef.id}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-            album.stickers[uniqueId] = {
-              ...stickerDef,
-              uniqueId,
-              obtainedAt: new Date().toISOString(),
-              isNew: true,
-              isPasted: false,
-              quantity: 1,
-              source: 'daily_challenge',
-            };
-          }
-        });
-        album.lastUpdated = new Date().toISOString();
-        saveUnifiedAlbum(album);
+        const reward = [];
+        for (let i = 0; i < 3; i++) {
+          const earned = earnFromMatch(true, ps);
+          if (earned) reward.push(earned.definition || earned);
+        }
         setChallengeReward(reward);
       }
     }
     if (won) {
       const lvRes = addWinXP({ playerId: pid, teamId: tid, xpAmount: 40 });
       if (lvRes.playerLevelUp || lvRes.teamLevelUp) setLevelUpInfo(lvRes);
+      // Ganhar figurinha por vencer
+      earnFromMatch(true, ps);
     }
     try {
       const res = saveMatchResult?.({ won, draw, playerGoals: ps, opponentGoals: os,

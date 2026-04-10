@@ -5,7 +5,8 @@
 
 import { 
   ALL_STICKERS, 
-  RARITY, 
+  RARITY,
+  CATEGORIES,
   ALBUM_CONFIG,
   ALBUM_PAGES 
 } from './stickersData.js';

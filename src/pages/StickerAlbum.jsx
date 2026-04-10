@@ -1,464 +1,739 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Clipboard, Sparkles, Gift, Share2, X, Check } from 'lucide-react';
-import { useStickerAlbum } from '@/hooks/useStickerAlbum.js';
-import { STICKERS_COLLECTION, RARITY_CONFIG } from '@/lib/unifiedStickers.js';
+import { useNavigate } from 'react-router-dom';
+import {
+  loadAlbum, saveAlbum, pasteSticker, calculateProgress,
+  getTradableStickers, generateTradeCode, redeemTradeCode,
+  redeemPromoCode, markAllAsSeen, drawSticker, addSticker
+} from '@/lib/albumSystem.js';
+import { ALL_STICKERS, RARITY, CATEGORIES, ALBUM_PAGES } from '@/lib/stickersData.js';
 
-// Modal de Recompensa
-function RewardModal({ reward, onClose }) {
-  if (!reward) return null;
-  
-  const rarity = RARITY_CONFIG[reward.sticker.rarity];
+// ── Cor por raridade ──────────────────────────────────────────────────────────
+const rarityStyle = {
+  common:    { border: 'border-gray-400',    bg: 'bg-gray-100',    text: 'text-gray-600',    badge: 'bg-gray-400',    glow: '' },
+  uncommon:  { border: 'border-green-400',   bg: 'bg-green-50',    text: 'text-green-700',   badge: 'bg-green-500',   glow: 'shadow-green-300' },
+  rare:      { border: 'border-blue-400',    bg: 'bg-blue-50',     text: 'text-blue-700',    badge: 'bg-blue-500',    glow: 'shadow-blue-300' },
+  epic:      { border: 'border-purple-500',  bg: 'bg-purple-50',   text: 'text-purple-700',  badge: 'bg-purple-600',  glow: 'shadow-purple-400' },
+  legendary: { border: 'border-yellow-500',  bg: 'bg-yellow-50',   text: 'text-amber-700',   badge: 'bg-yellow-500',  glow: 'shadow-yellow-400' },
+  mythic:    { border: 'border-pink-500',    bg: 'bg-pink-50',     text: 'text-pink-700',    badge: 'bg-pink-600',    glow: 'shadow-pink-400' },
+};
+
+// ── Mini-card de figurinha ────────────────────────────────────────────────────
+function StickerCard({ sticker, userSticker, onPaste, onTrade, selected, onSelect, compact }) {
+  const style = rarityStyle[sticker.rarity] || rarityStyle.common;
+  const owned   = !!userSticker;
+  const pasted  = userSticker?.isPasted;
+  const isNew   = userSticker?.isNew;
+  const qty     = userSticker?.quantity || 0;
+
+  const handleClick = () => {
+    if (owned && !pasted) onSelect(sticker);
+  };
 
   return (
-    <AnimatePresence>
+    <motion.div
+      layout
+      whileHover={owned ? { scale: 1.05, y: -4 } : {}}
+      whileTap={owned ? { scale: 0.96 } : {}}
+      onClick={handleClick}
+      className={`
+        relative rounded-2xl border-2 p-2 text-center cursor-pointer transition-all select-none
+        ${owned ? style.border + ' ' + style.bg : 'border-dashed border-gray-300 bg-gray-50 opacity-50'}
+        ${pasted ? 'opacity-90' : ''}
+        ${selected ? 'ring-4 ring-offset-1 ring-purple-400' : ''}
+        ${owned && !pasted ? 'shadow-md ' + style.glow : ''}
+      `}
+    >
+      {/* Badge raridade */}
+      {owned && (
+        <span className={`absolute top-1 left-1 text-[9px] font-bold text-white px-1 rounded-full ${style.badge}`}>
+          {RARITY[sticker.rarity]?.label}
+        </span>
+      )}
+
+      {/* Badge NOVA */}
+      {isNew && !pasted && (
+        <motion.span
+          initial={{ scale: 0 }} animate={{ scale: 1 }}
+          className="absolute -top-2 -right-2 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full z-10"
+        >
+          NOVA!
+        </motion.span>
+      )}
+
+      {/* Badge repetida */}
+      {owned && qty > 1 && (
+        <span className="absolute top-1 right-1 bg-orange-500 text-white text-[9px] font-bold px-1.5 rounded-full">
+          x{qty}
+        </span>
+      )}
+
+      {/* Emoji / silhueta */}
+      <div className={`text-3xl my-1 ${!owned ? 'grayscale blur-sm' : pasted ? '' : 'drop-shadow-md'}`}>
+        {owned ? sticker.emoji : '❓'}
+      </div>
+
+      {/* Nome */}
+      {!compact && (
+        <p className={`text-[10px] font-bold leading-tight ${owned ? style.text : 'text-gray-400'} line-clamp-2`}>
+          {owned ? sticker.name : '???'}
+        </p>
+      )}
+
+      {/* Ícone colada */}
+      {pasted && (
+        <div className="absolute inset-0 flex items-end justify-center pb-1 pointer-events-none">
+          <span className="text-[10px] bg-green-500 text-white px-1 rounded">✓ Colada</span>
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+// ── Animação de colar figurinha ──────────────────────────────────────────────
+function PasteAnimation({ sticker, onDone }) {
+  const style = rarityStyle[sticker.rarity] || rarityStyle.common;
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      {/* Fundo brilhante */}
       <motion.div
+        className="absolute inset-0 bg-black/60"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/70 backdrop-blur-md z-[60] flex items-center justify-center p-4"
-        onClick={onClose}
-      >
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {[...Array(20)].map((_, i) => (
-            <motion.div
-              key={i}
-              initial={{ x: Math.random() * 500, y: -50 }}
-              animate={{ y: 800, rotate: 360 }}
-              transition={{ duration: 2 + Math.random() * 2, repeat: Infinity, delay: Math.random() * 2 }}
-              className="absolute text-2xl"
-            >
-              {['⭐', '✨', '🎉', '🎊', '💫', '🌟'][Math.floor(Math.random() * 6)]}
-            </motion.div>
-          ))}
-        </div>
+      />
 
+      {/* Partículas */}
+      {[...Array(12)].map((_, i) => (
         <motion.div
-          initial={{ scale: 0, rotate: -180 }}
-          animate={{ scale: 1, rotate: 0 }}
-          exit={{ scale: 0, rotate: 180 }}
-          transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-          onClick={(e) => e.stopPropagation()}
-          className={`relative w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-br ${rarity.bgGradient} p-1`}
+          key={i}
+          className="absolute w-3 h-3 rounded-full"
+          style={{ background: RARITY[sticker.rarity]?.color || '#9CA3AF' }}
+          initial={{ x: 0, y: 0, opacity: 1, scale: 1 }}
+          animate={{
+            x: (Math.cos((i / 12) * Math.PI * 2) * 160),
+            y: (Math.sin((i / 12) * Math.PI * 2) * 160),
+            opacity: 0,
+            scale: 0
+          }}
+          transition={{ duration: 0.8, delay: 0.3, ease: 'easeOut' }}
+        />
+      ))}
+
+      {/* Card principal */}
+      <motion.div
+        className={`relative z-10 rounded-3xl border-4 ${style.border} ${style.bg} p-8 text-center shadow-2xl w-56`}
+        initial={{ scale: 0, rotate: -15 }}
+        animate={{ scale: [0, 1.3, 1], rotate: [- 15, 5, 0] }}
+        transition={{ duration: 0.6, ease: 'backOut' }}
+        onAnimationComplete={() => setTimeout(onDone, 1200)}
+      >
+        <motion.div
+          className="text-7xl mb-2"
+          animate={{ rotate: [0, -10, 10, -5, 0] }}
+          transition={{ delay: 0.5, duration: 0.5 }}
         >
-          <div className="bg-white rounded-[22px] p-6 text-center">
-            <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 }} className="mb-4">
-              <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r ${rarity.bgGradient} text-white font-bold shadow-lg`}>
-                <Gift className="w-5 h-5" />
-                {reward.isNew ? 'Nova Figurinha!' : 'Figurinha Repetida'}
-              </span>
-            </motion.div>
-
-            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2, type: 'spring' }} className={`w-40 h-40 mx-auto rounded-2xl bg-gradient-to-br ${rarity.bgGradient} flex items-center justify-center shadow-xl mb-4 relative`}>
-              {reward.sticker.hasGlitter && (
-                <div className="absolute inset-0 rounded-2xl overflow-hidden">
-                  <motion.div animate={{ x: ['-100%', '100%'] }} transition={{ repeat: Infinity, duration: 2, ease: 'linear' }} className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -skew-x-12" />
-                </div>
-              )}
-              <motion.span animate={reward.sticker.hasAnimation ? { scale: [1, 1.2, 1], rotate: [0, 10, -10, 0] } : {}} transition={{ repeat: Infinity, duration: 2 }} className="text-7xl relative z-10">
-                {reward.sticker.emoji}
-              </motion.span>
-            </motion.div>
-
-            <motion.h3 initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="font-heading text-2xl font-bold text-gray-900 mb-1">
-              {reward.sticker.name}
-            </motion.h3>
-            
-            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="text-gray-600 mb-2">
-              {reward.sticker.description}
-            </motion.p>
-            
-            <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }} className={`inline-block px-3 py-1 rounded-full text-sm font-semibold bg-gradient-to-r ${rarity.bgGradient} text-white`}>
-              {rarity.label}
-            </motion.span>
-
-            {!reward.isNew && (
-              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }} className="mt-3 text-sm text-gray-500">
-                Você agora tem {reward.sticker.quantity}x desta figurinha
-              </motion.p>
-            )}
-
-            <motion.button initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={onClose} className="mt-6 w-full py-3 rounded-xl font-bold bg-gray-900 text-white hover:bg-gray-800 transition-colors">
-              {reward.isNew ? 'Colar no Álbum!' : 'Continuar'}
-            </motion.button>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  );
-}
-
-// Card de Figurinha
-function StickerCard({ sticker, userSticker, onClick }) {
-  const rarity = RARITY_CONFIG[sticker.rarity];
-  const isOwned = !!userSticker;
-  const isPasted = userSticker?.isPasted;
-  const quantity = userSticker?.quantity || 0;
-
-  if (!isOwned) {
-    return (
-      <motion.div whileHover={{ scale: 1.02 }} className="aspect-square rounded-xl bg-gradient-to-br from-gray-200 to-gray-300 border-2 border-dashed border-gray-400 flex flex-col items-center justify-center p-2 cursor-not-allowed opacity-60">
-        <span className="text-2xl mb-1">❓</span>
-        <span className="text-[10px] text-gray-500 text-center font-semibold">???</span>
-      </motion.div>
-    );
-  }
-
-  return (
-    <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onClick} className={`relative aspect-square rounded-xl border-2 overflow-hidden ${isPasted ? `bg-gradient-to-br ${rarity.bgGradient} ${rarity.borderColor} shadow-lg ${rarity.glowColor}` : 'bg-white border-gray-300'} ${userSticker?.isNew ? 'ring-2 ring-yellow-400 ring-offset-2 animate-pulse' : ''} transition-all duration-300`}>
-      {sticker.hasGlitter && isPasted && (
-        <div className="absolute inset-0 opacity-30">
-          <div className="absolute inset-0 animate-pulse bg-gradient-to-tr from-white/40 via-transparent to-white/40" />
-        </div>
-      )}
-
-      <div className="relative h-full flex flex-col items-center justify-center p-2">
-        <motion.span animate={sticker.hasAnimation && isPasted ? { scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] } : {}} transition={{ repeat: Infinity, duration: 2 }} className="text-4xl mb-1">
           {sticker.emoji}
+        </motion.div>
+
+        <p className={`font-bold text-lg ${style.text}`}>{sticker.name}</p>
+
+        <motion.span
+          className={`inline-block mt-2 text-xs font-bold text-white px-3 py-1 rounded-full ${style.badge}`}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          {RARITY[sticker.rarity]?.label}
         </motion.span>
 
-        <p className={`font-heading font-bold text-xs text-center leading-tight ${isPasted ? 'text-white' : 'text-gray-900'}`}>
-          {sticker.name}
+        <motion.p
+          className="text-green-600 font-bold text-lg mt-3"
+          initial={{ opacity: 0, scale: 0 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.6 }}
+        >
+          ✨ Colada no álbum!
+        </motion.p>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ── Animação de página completa ───────────────────────────────────────────────
+function PageCompleteAnimation({ page, onDone }) {
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <div className="absolute inset-0 bg-black/80" />
+
+      {/* Fogos */}
+      {[...Array(20)].map((_, i) => (
+        <motion.div
+          key={i}
+          className="absolute text-2xl"
+          initial={{ x: '50vw', y: '50vh', opacity: 1 }}
+          animate={{
+            x: `${Math.random() * 100}vw`,
+            y: `${Math.random() * 100}vh`,
+            opacity: 0
+          }}
+          transition={{ duration: 1.5, delay: i * 0.05 }}
+        >
+          {['🎉', '⭐', '🌟', '✨', '🎊', '🏆'][i % 6]}
+        </motion.div>
+      ))}
+
+      <motion.div
+        className="relative z-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-3xl p-8 text-center shadow-2xl max-w-xs mx-4"
+        initial={{ scale: 0, rotate: -10 }}
+        animate={{ scale: 1, rotate: 0 }}
+        transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+        onAnimationComplete={() => setTimeout(onDone, 2500)}
+      >
+        <motion.div
+          className="text-6xl mb-3"
+          animate={{ rotate: [0, -15, 15, -10, 0], scale: [1, 1.3, 1] }}
+          transition={{ duration: 0.8, delay: 0.3 }}
+        >
+          🏆
+        </motion.div>
+        <p className="font-heading font-black text-white text-2xl">Página Completa!</p>
+        <p className="text-yellow-100 mt-1 font-bold">{page.title}</p>
+        <p className="text-white/80 text-sm mt-2">Você completou todas as figurinhas desta página!</p>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ── Modal de detalhes / colar / trocar ───────────────────────────────────────
+function StickerDetailModal({ sticker, userSticker, onClose, onPaste, onGenerateTrade }) {
+  const style = rarityStyle[sticker.rarity] || rarityStyle.common;
+  const pasted = userSticker?.isPasted;
+  const qty = userSticker?.quantity || 1;
+  const hasDuplicate = qty > 1;
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-40 flex items-center justify-center p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <div className="absolute inset-0 bg-black/70" />
+
+      <motion.div
+        className={`relative z-10 rounded-3xl border-4 ${style.border} ${style.bg} p-6 text-center max-w-xs w-full shadow-2xl`}
+        initial={{ scale: 0.7, y: 60 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.7, y: 60 }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Raridade */}
+        <span className={`inline-block text-xs font-bold text-white px-3 py-1 rounded-full mb-3 ${style.badge}`}>
+          {RARITY[sticker.rarity]?.label}
+        </span>
+
+        {/* Emoji */}
+        <div className="text-7xl my-2">{sticker.emoji}</div>
+
+        {/* Nome e info */}
+        <h3 className={`font-heading font-black text-xl ${style.text}`}>{sticker.name}</h3>
+        {sticker.position && <p className="text-gray-500 text-sm">{sticker.position}</p>}
+        {sticker.country && <p className="text-gray-500 text-xs">{sticker.country}</p>}
+        <p className="text-gray-600 text-sm mt-2 italic">{sticker.description}</p>
+
+        {/* Categoria */}
+        <p className="text-xs text-gray-400 mt-1">
+          {CATEGORIES[sticker.category]?.emoji} {CATEGORIES[sticker.category]?.label}
         </p>
 
-        {quantity > 1 && (
-          <div className="absolute -top-1 -left-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
-            {quantity}
-          </div>
+        {/* Quantidade */}
+        {qty > 1 && (
+          <p className="mt-2 text-orange-500 font-bold text-sm">Você tem {qty} cópias</p>
         )}
 
-        {userSticker?.isNew && (
-          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="absolute -top-1 -right-1 bg-yellow-400 text-yellow-900 text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow-lg">
-            NOVA!
-          </motion.div>
+        {/* Status */}
+        {pasted
+          ? <p className="mt-3 text-green-600 font-bold">✓ Já está no seu álbum</p>
+          : (
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={onPaste}
+              className="mt-4 w-full py-3 bg-purple-600 text-white font-bold rounded-xl"
+            >
+              📌 Colar no Álbum
+            </motion.button>
+          )
+        }
+
+        {/* Trocar (se tiver repetida) */}
+        {hasDuplicate && (
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={onGenerateTrade}
+            className="mt-2 w-full py-3 bg-orange-500 text-white font-bold rounded-xl"
+          >
+            🔄 Gerar Código de Troca
+          </motion.button>
         )}
 
-        {!isPasted && (
-          <div className="absolute bottom-1 left-1 right-1 bg-gray-100/90 rounded text-[8px] text-gray-600 text-center py-0.5 font-medium">
-            Toque para colar
-          </div>
-        )}
-
-        {isPasted && (
-          <div className="absolute top-1 right-1 bg-green-500 text-white rounded-full p-0.5">
-            <Check className="w-3 h-3" />
-          </div>
-        )}
-      </div>
-    </motion.button>
-  );
-}
-
-// Modal de Detalhes
-function StickerDetailModal({ sticker, userSticker, onClose, onPaste, onTrade }) {
-  const rarity = RARITY_CONFIG[sticker.rarity];
-  const isPasted = userSticker?.isPasted;
-  const canTrade = userSticker && (userSticker.quantity > 1 || (userSticker.quantity === 1 && userSticker.isPasted));
-
-  return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <motion.div initial={{ scale: 0.8, y: 50 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.8, y: 50 }} onClick={(e) => e.stopPropagation()} className={`relative w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl ${isPasted ? `bg-gradient-to-br ${rarity.bgGradient}` : 'bg-white'}`}>
-        <div className="relative p-6 text-center">
-          <button onClick={onClose} className="absolute top-4 right-4 p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors">
-            <X className={`w-5 h-5 ${isPasted ? 'text-white' : 'text-gray-700'}`} />
-          </button>
-
-          <motion.div animate={sticker.hasAnimation ? { y: [0, -10, 0], rotate: [0, 5, -5, 0] } : {}} transition={{ repeat: Infinity, duration: 3 }} className="text-8xl mb-4 drop-shadow-lg">
-            {sticker.emoji}
-          </motion.div>
-
-          <h3 className={`font-heading text-2xl font-bold mb-1 ${isPasted ? 'text-white' : 'text-gray-900'}`}>
-            {sticker.name}
-          </h3>
-          <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-semibold ${isPasted ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'}`}>
-            {rarity.label}
-            {sticker.hasGlitter && <Sparkles className="w-4 h-4" />}
-          </span>
-        </div>
-
-        <div className={`p-6 pt-0 ${isPasted ? 'text-white' : 'text-gray-700'}`}>
-          <p className="text-center mb-4 opacity-90">{sticker.description}</p>
-
-          <div className={`rounded-xl p-4 mb-4 ${isPasted ? 'bg-white/10' : 'bg-gray-50'}`}>
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm opacity-70">Categoria</span>
-              <span className="font-semibold capitalize">{sticker.category}</span>
-            </div>
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm opacity-70">XP Bônus</span>
-              <span className="font-semibold">+{rarity.xpBonus} XP</span>
-            </div>
-            {userSticker && (
-              <div className="flex justify-between items-center">
-                <span className="text-sm opacity-70">Quantidade</span>
-                <span className="font-semibold">{userSticker.quantity}x</span>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-3">
-            {!isPasted ? (
-              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={onPaste} className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg">
-                <Check className="w-5 h-5" />
-                Colar no Álbum
-              </motion.button>
-            ) : (
-              <div className="flex items-center justify-center gap-2 text-green-400 font-bold">
-                <Check className="w-5 h-5" />
-                Já colada no álbum
-              </div>
-            )}
-
-            {canTrade && (
-              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={onTrade} className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 ${isPasted ? 'bg-white/10 text-white border border-white/30' : 'bg-white border-2 border-purple-500 text-purple-600'}`}>
-                <Share2 className="w-5 h-5" />
-                Gerar Código de Troca
-              </motion.button>
-            )}
-          </div>
-        </div>
+        <button onClick={onClose} className="mt-3 w-full py-2 text-gray-500 font-semibold text-sm">
+          Fechar
+        </button>
       </motion.div>
     </motion.div>
   );
 }
 
-// Modal de Código
-function CodeModal({ isOpen, onClose, mode, onSubmit, tradeCode, tradeSticker }) {
-  const [inputCode, setInputCode] = useState('');
-  const [error, setError] = useState('');
+// ── Modal de código gerado ───────────────────────────────────────────────────
+function TradeCodeModal({ code, sticker, onClose }) {
+  const [copied, setCopied] = useState(false);
 
-  if (!isOpen) return null;
-
-  const handleSubmit = () => {
-    if (!inputCode.trim()) {
-      setError('Digite um código!');
-      return;
-    }
-    setError('');
-    onSubmit(inputCode.trim().toUpperCase());
-    setInputCode('');
+  const copy = () => {
+    navigator.clipboard?.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="font-heading text-xl font-bold">
-            {mode === 'redeem' ? '🎁 Resgatar Código' : '💎 Código de Troca'}
-          </h3>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full">
-            <X className="w-5 h-5" />
-          </button>
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <div className="absolute inset-0 bg-black/70" />
+      <motion.div
+        className="relative z-10 bg-white rounded-3xl p-6 max-w-xs w-full shadow-2xl text-center"
+        initial={{ scale: 0.8, y: 40 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.8 }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="text-5xl mb-2">🎁</div>
+        <h3 className="font-heading font-black text-xl mb-1">Código de Troca!</h3>
+        <p className="text-gray-500 text-sm mb-4">
+          Envie este código para a sua amiga trocar {sticker.emoji} {sticker.name}
+        </p>
+
+        <div className="bg-gray-100 rounded-xl p-3 mb-4 font-mono font-bold text-lg tracking-widest text-gray-800">
+          {code}
         </div>
 
-        {mode === 'redeem' ? (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">Digite um código válido para ganhar figurinhas:</p>
-            <input type="text" value={inputCode} onChange={(e) => setInputCode(e.target.value.toUpperCase())} placeholder="Ex: COROA2024 ou TROCA-XXX" onKeyPress={(e) => e.key === 'Enter' && handleSubmit()} className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:outline-none font-mono text-center uppercase tracking-wider" />
-            {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-            <button onClick={handleSubmit} className="w-full py-3 rounded-xl font-bold bg-purple-500 text-white hover:bg-purple-600 transition-colors">Resgatar!</button>
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={copy}
+          className={`w-full py-3 rounded-xl font-bold text-white mb-2 ${copied ? 'bg-green-500' : 'bg-blue-500'}`}
+        >
+          {copied ? '✓ Copiado!' : '📋 Copiar Código'}
+        </motion.button>
+
+        <button onClick={onClose} className="w-full py-2 text-gray-400 text-sm font-semibold">Fechar</button>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ── Modal para inserir código de troca ───────────────────────────────────────
+function RedeemModal({ onClose }) {
+  const [code, setCode] = useState('');
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleRedeem = () => {
+    if (!code.trim()) return;
+    setLoading(true);
+    setTimeout(() => {
+      // Tentar código de troca normal
+      let res = redeemTradeCode(code);
+      // Se não funcionar, tentar código promocional
+      if (!res.success) res = redeemPromoCode(code);
+      setResult(res);
+      setLoading(false);
+    }, 600);
+  };
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <div className="absolute inset-0 bg-black/70" />
+      <motion.div
+        className="relative z-10 bg-white rounded-3xl p-6 max-w-xs w-full shadow-2xl"
+        initial={{ scale: 0.8, y: 40 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.8 }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="text-center mb-4">
+          <div className="text-5xl mb-2">🔑</div>
+          <h3 className="font-heading font-black text-xl">Inserir Código</h3>
+          <p className="text-gray-500 text-sm">Cole aqui o código de troca da sua amiga</p>
+        </div>
+
+        {!result ? (
+          <>
+            <input
+              value={code}
+              onChange={e => setCode(e.target.value.toUpperCase())}
+              placeholder="Ex: TROCA-ABC123"
+              className="w-full border-2 border-gray-200 rounded-xl p-3 text-center font-mono font-bold text-lg tracking-wider focus:border-purple-400 outline-none mb-3"
+            />
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={handleRedeem}
+              disabled={!code.trim() || loading}
+              className="w-full py-3 bg-purple-600 text-white font-bold rounded-xl disabled:opacity-50"
+            >
+              {loading ? '...' : '✨ Resgatar'}
+            </motion.button>
+          </>
+        ) : result.success ? (
+          <div className="text-center">
+            <div className="text-6xl mb-2">
+              {result.sticker?.definition?.emoji || result.stickers?.[0]?.definition?.emoji || '🎉'}
+            </div>
+            <p className="text-green-600 font-bold text-lg">{result.message || 'Figurinhas resgatadas!'}</p>
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={onClose}
+              className="mt-4 w-full py-3 bg-green-500 text-white font-bold rounded-xl"
+            >
+              Ver no Álbum
+            </motion.button>
           </div>
         ) : (
-          <div className="space-y-4">
-            {tradeSticker && (
-              <div className="text-center">
-                <p className="text-sm text-gray-600 mb-2">Você está trocando:</p>
-                <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r ${RARITY_CONFIG[tradeSticker.rarity].bgGradient} text-white`}>
-                  <span className="text-2xl">{tradeSticker.emoji}</span>
-                  <span className="font-bold">{tradeSticker.name}</span>
-                </div>
-              </div>
-            )}
-            <p className="text-sm text-gray-600 text-center">Compartilhe este código com uma amiga:</p>
-            <div className="bg-gradient-to-r from-purple-100 to-pink-100 rounded-xl p-4">
-              <div className="bg-white rounded-lg p-3 font-mono text-center text-purple-700 font-bold tracking-wider border-2 border-purple-200 text-lg break-all">
-                {tradeCode || 'Gerando...'}
-              </div>
-            </div>
-            <p className="text-xs text-gray-500 text-center">⚠️ Este código só pode ser usado uma vez!</p>
-            <button onClick={onClose} className="w-full py-3 rounded-xl font-bold bg-gray-900 text-white hover:bg-gray-800 transition-colors">Fechar</button>
+          <div className="text-center">
+            <div className="text-5xl mb-2">😔</div>
+            <p className="text-red-500 font-bold">{result.error}</p>
+            <button
+              onClick={() => { setResult(null); setCode(''); }}
+              className="mt-4 w-full py-3 bg-gray-100 text-gray-600 font-bold rounded-xl"
+            >
+              Tentar novamente
+            </button>
           </div>
         )}
+
+        <button onClick={onClose} className="mt-3 w-full py-2 text-gray-400 text-sm">Fechar</button>
       </motion.div>
     </motion.div>
   );
 }
 
-// Página Principal
-export default function StickerAlbum() {
-  const {
-    userStickers,
-    progress,
-    lastReward,
-    showRewardAnimation,
-    newStickersCount,
-    tradableStickers,
-    getUserSticker,
-    pasteSticker,
-    useCode,
-    generateTrade,
-    useTradeCode,
-    closeRewardAnimation,
-    allStickers,
-  } = useStickerAlbum();
+// ── Página de categoria (grid de figurinhas) ──────────────────────────────────
+function CategoryPage({ categoryId, album, onSelectSticker }) {
+  const stickers = ALL_STICKERS.filter(s => s.category === categoryId);
+  const pastedIds = Object.values(album.stickers).filter(s => s.isPasted).map(s => s.id);
+  const totalPasted = stickers.filter(s => pastedIds.includes(s.id)).length;
+  const cat = CATEGORIES[categoryId];
 
-  const [selectedTab, setSelectedTab] = useState('all');
-  const [selectedSticker, setSelectedSticker] = useState(null);
-  const [showCodeModal, setShowCodeModal] = useState(false);
-  const [showTradeModal, setShowTradeModal] = useState(false);
-  const [tradeCode, setTradeCode] = useState('');
-  const [tradeSticker, setTradeSticker] = useState(null);
-  const [codeError, setCodeError] = useState('');
-
-  const filteredStickers = selectedTab === 'all' 
-    ? allStickers 
-    : allStickers.filter(s => s.rarity === selectedTab);
-
-  const handlePaste = () => {
-    if (selectedSticker) {
-      const userSticker = getUserSticker(selectedSticker.id);
-      if (userSticker) {
-        pasteSticker(userSticker.uniqueId);
-      }
-      setSelectedSticker(null);
-    }
-  };
-
-  const handleTrade = () => {
-    if (selectedSticker) {
-      const userSticker = getUserSticker(selectedSticker.id);
-      if (userSticker) {
-        const result = generateTrade(userSticker.uniqueId);
-        if (result.success && result.code) {
-          setTradeCode(result.code);
-          setTradeSticker(selectedSticker);
-          setShowTradeModal(true);
-        }
-      }
-      setSelectedSticker(null);
-    }
-  };
-
-  const handleRedeemCode = (code) => {
-    const result = useCode(code);
-    if (result.success) {
-      setShowCodeModal(false);
-      setCodeError('');
-    } else {
-      setCodeError(result.error || 'Erro ao resgatar');
-    }
-  };
-
-  const handleTradeCodeInput = (code) => {
-    const result = useTradeCode(code);
-    if (result.success) {
-      setShowCodeModal(false);
-      setCodeError('');
-    } else {
-      setCodeError(result.error || 'Código inválido ou já usado!');
-    }
-  };
-
-  const selectedUserSticker = selectedSticker ? getUserSticker(selectedSticker.id) : undefined;
+  const getUserSticker = (id) => Object.values(album.stickers).find(s => s.id === id) || null;
 
   return (
-    <div className="min-h-screen p-4 pb-10 max-w-2xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6 mt-2">
-        <Link to="/" className="p-2 rounded-xl bg-muted active:scale-95 transition-transform">
-          <ArrowLeft className="w-5 h-5" />
-        </Link>
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <h1 className="font-heading font-bold text-2xl">💎 Álbum de Figurinhas</h1>
-            {newStickersCount > 0 && (
-              <span className="bg-pink-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                {newStickersCount} nova{newStickersCount > 1 ? 's' : ''}
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground">Colecione itens fofos e mágicos</p>
+    <div className="p-4 space-y-4">
+      {/* Header da categoria */}
+      <div className="text-center">
+        <div className="text-4xl">{cat.emoji}</div>
+        <h2 className="font-heading font-black text-lg">{cat.label}</h2>
+        <p className="text-sm text-gray-500">{totalPasted} / {stickers.length} coladas</p>
+        <div className="mt-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+          <motion.div
+            className="h-full rounded-full"
+            style={{ background: cat.color }}
+            initial={{ width: 0 }}
+            animate={{ width: `${(totalPasted / stickers.length) * 100}%` }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+          />
         </div>
       </div>
 
-      {/* Progresso */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 rounded-2xl p-4 mb-6 text-white shadow-xl">
-        <div className="flex items-center justify-between mb-2">
-          <p className="font-bold text-sm">Progresso do Álbum</p>
-          <div className="flex items-center gap-2">
-            <p className="font-heading font-bold text-lg">{progress.obtained}/{progress.total}</p>
-          </div>
-        </div>
-        
-        <div className="h-3 bg-black/20 rounded-full overflow-hidden">
-          <motion.div className="h-full bg-yellow-300 rounded-full" initial={{ width: 0 }} animate={{ width: `${progress.percentage}%` }} transition={{ duration: 0.5 }} />
-        </div>
-        
-        <p className="text-xs text-white/80 mt-2">{progress.percentage}% completo · {progress.pasted} coladas</p>
-      </motion.div>
-
-      {/* Botões de ação */}
-      <div className="flex gap-3 mb-4">
-        <button onClick={() => { setCodeError(''); setShowCodeModal(true); }} className="flex-1 py-3 rounded-xl font-bold bg-white border-2 border-purple-500 text-purple-600 hover:bg-purple-50 transition-colors flex items-center justify-center gap-2 shadow-sm">
-          <Clipboard className="w-5 h-5" />
-          Resgatar Código
-        </button>
-        <button onClick={() => { setCodeError(''); setShowCodeModal(true); }} className="flex-1 py-3 rounded-xl font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-2 shadow-lg">
-          <Gift className="w-5 h-5" />
-          Usar Código
-        </button>
-      </div>
-
-      {/* Filtros */}
-      <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-        {[
-          { id: 'all', label: '✨ Todas', color: 'from-gray-500 to-gray-600' },
-          { id: 'common', label: 'Comuns', color: 'from-gray-400 to-gray-500' },
-          { id: 'rare', label: 'Raras', color: 'from-blue-400 to-blue-600' },
-          { id: 'epic', label: 'Épicas', color: 'from-purple-400 to-purple-600' },
-          { id: 'legendary', label: 'Lendárias', color: 'from-yellow-400 to-orange-500' },
-        ].map((tab) => (
-          <button key={tab.id} onClick={() => setSelectedTab(tab.id)} className={`px-4 py-2 rounded-xl font-bold whitespace-nowrap transition-all ${selectedTab === tab.id ? `bg-gradient-to-r ${tab.color} text-white shadow-lg` : 'bg-white text-gray-600 hover:bg-gray-100'}`}>
-            {tab.label}
-          </button>
+      {/* Grid */}
+      <div className="grid grid-cols-3 gap-2">
+        {stickers.map(sticker => (
+          <StickerCard
+            key={sticker.id}
+            sticker={sticker}
+            userSticker={getUserSticker(sticker.id)}
+            onSelect={onSelectSticker}
+            selected={false}
+          />
         ))}
       </div>
+    </div>
+  );
+}
 
-      {/* Grid de figurinhas */}
-      <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-        {filteredStickers.map((sticker, idx) => {
-          const userSticker = getUserSticker(sticker.id);
+// ── Painel de progresso geral ─────────────────────────────────────────────────
+function ProgressPanel({ progress }) {
+  return (
+    <div className="p-4 space-y-4">
+      {/* Total */}
+      <div className="bg-gradient-to-br from-purple-600 to-pink-600 rounded-2xl p-5 text-white text-center">
+        <p className="text-5xl font-black">{progress.percentage}%</p>
+        <p className="text-purple-200 text-sm">{progress.pasted} / {progress.total} figurinhas coladas</p>
+        <div className="mt-3 h-3 bg-white/20 rounded-full overflow-hidden">
+          <motion.div
+            className="h-full bg-white rounded-full"
+            initial={{ width: 0 }}
+            animate={{ width: `${progress.percentage}%` }}
+            transition={{ duration: 1, ease: 'easeOut' }}
+          />
+        </div>
+      </div>
+
+      {/* Por categoria */}
+      <div className="space-y-2">
+        <h3 className="font-heading font-bold text-sm text-gray-500 uppercase">Por Categoria</h3>
+        {Object.entries(CATEGORIES).map(([catId, cat]) => {
+          const p = progress.byCategory[catId] || { obtained: 0, total: 0, percentage: 0 };
           return (
-            <motion.div key={sticker.id} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: idx * 0.03 }}>
-              <StickerCard sticker={sticker} userSticker={userSticker} onClick={() => setSelectedSticker(sticker)} />
-            </motion.div>
+            <div key={catId} className="flex items-center gap-3">
+              <span className="text-xl">{cat.emoji}</span>
+              <div className="flex-1">
+                <div className="flex justify-between text-xs mb-0.5">
+                  <span className="font-semibold">{cat.label}</span>
+                  <span className="text-gray-400">{p.obtained}/{p.total}</span>
+                </div>
+                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full rounded-full"
+                    style={{ background: cat.color }}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${p.percentage}%` }}
+                    transition={{ duration: 0.8 }}
+                  />
+                </div>
+              </div>
+            </div>
           );
         })}
       </div>
 
-      {/* Info */}
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="mt-8 bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 text-center">
-        <p className="text-sm text-muted-foreground">
-          💡 Complete mini-games, lições e desafios para ganhar mais figurinhas!
-          {tradableStickers.length > 0 && (
-            <><br /><span className="text-purple-600 font-semibold">Você tem {tradableStickers.length} figurinha{tradableStickers.length > 1 ? 's' : ''} para trocar!</span></>
+      {/* Por raridade */}
+      <div className="space-y-2">
+        <h3 className="font-heading font-bold text-sm text-gray-500 uppercase">Por Raridade</h3>
+        <div className="grid grid-cols-2 gap-2">
+          {Object.entries(RARITY).map(([rarId, rar]) => {
+            const p = progress.byRarity[rarId] || { obtained: 0, total: 0 };
+            const style = rarityStyle[rarId];
+            return (
+              <div key={rarId} className={`rounded-xl p-2 border-2 ${style.border} ${style.bg}`}>
+                <p className={`text-xs font-bold ${style.text}`}>{rar.label}</p>
+                <p className="text-gray-500 text-xs">{p.obtained}/{p.total}</p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Páginas completas */}
+      <div className="bg-yellow-50 border-2 border-yellow-300 rounded-2xl p-3 text-center">
+        <p className="text-2xl font-black text-yellow-600">{progress.pagesCompleted} / {progress.totalPages}</p>
+        <p className="text-yellow-500 text-xs font-semibold">Páginas completas</p>
+      </div>
+    </div>
+  );
+}
+
+// ── Página Principal do Álbum ─────────────────────────────────────────────────
+export default function StickerAlbum({ onClose } = {}) {
+  const navigate = useNavigate();
+  const [album, setAlbum] = useState(() => loadAlbum());
+  const [progress, setProgress] = useState(() => calculateProgress());
+  const [activeTab, setActiveTab] = useState('brazil');
+  const [selectedSticker, setSelectedSticker] = useState(null);
+  const [pasteAnim, setPasteAnim] = useState(null);
+  const [pageCompleteAnim, setPageCompleteAnim] = useState(null);
+  const [tradeCode, setTradeCode] = useState(null);
+  const [showRedeem, setShowRedeem] = useState(false);
+  const [showProgress, setShowProgress] = useState(false);
+  const [filterOwned, setFilterOwned] = useState(false);
+
+  const refresh = () => {
+    const a = loadAlbum();
+    setAlbum(a);
+    setProgress(calculateProgress());
+  };
+
+  // Marcar todas como vistas ao abrir
+  useEffect(() => {
+    markAllAsSeen();
+  }, []);
+
+  // Colar figurinha
+  const handlePaste = () => {
+    if (!selectedSticker) return;
+    const userSticker = Object.values(album.stickers).find(s => s.id === selectedSticker.id);
+    if (!userSticker) return;
+
+    const result = pasteSticker(userSticker.uniqueId);
+    if (result.success) {
+      setPasteAnim(selectedSticker);
+      setSelectedSticker(null);
+
+      if (result.completedPages?.length > 0) {
+        setTimeout(() => {
+          setPasteAnim(null);
+          setPageCompleteAnim(result.completedPages[0]);
+        }, 2000);
+      }
+
+      refresh();
+    }
+  };
+
+  // Gerar código de troca
+  const handleGenerateTrade = () => {
+    if (!selectedSticker) return;
+    const userSticker = Object.values(album.stickers).find(s => s.id === selectedSticker.id);
+    if (!userSticker) return;
+
+    const result = generateTradeCode(userSticker.uniqueId);
+    if (result.success) {
+      setTradeCode({ code: result.code, sticker: selectedSticker });
+      setSelectedSticker(null);
+      refresh();
+    }
+  };
+
+  const getUserSticker = (id) => Object.values(album.stickers).find(s => s.id === id) || null;
+
+  const tabs = Object.values(CATEGORIES);
+
+  return (
+    <div className="fixed inset-0 z-30 flex flex-col bg-white" style={{ maxWidth: 480, margin: '0 auto' }}>
+      {/* Header */}
+      <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 pt-10 pb-3 flex-shrink-0">
+        <div className="flex items-center justify-between">
+          <button onClick={() => onClose ? onClose() : navigate(-1)} className="text-white/80 font-bold text-sm px-2 py-1">← Voltar</button>
+          <div className="text-center">
+            <h1 className="font-heading font-black text-lg leading-tight">Álbum de Figurinhas</h1>
+            <p className="text-purple-200 text-xs">{progress.pasted} / {progress.total} coladas · {progress.percentage}%</p>
+          </div>
+          <button
+            onClick={() => setShowProgress(v => !v)}
+            className="text-white/80 font-bold text-sm px-2 py-1"
+          >
+            📊
+          </button>
+        </div>
+
+        {/* Barra geral */}
+        <div className="mt-2 h-1.5 bg-white/20 rounded-full overflow-hidden">
+          <motion.div
+            className="h-full bg-white rounded-full"
+            animate={{ width: `${progress.percentage}%` }}
+            transition={{ duration: 0.8 }}
+          />
+        </div>
+
+        {/* Botões de ação */}
+        <div className="flex gap-2 mt-3">
+          <button
+            onClick={() => setShowRedeem(true)}
+            className="flex-1 bg-white/20 text-white text-xs font-bold py-2 rounded-xl"
+          >
+            🔑 Inserir Código
+          </button>
+          <button
+            onClick={() => setFilterOwned(v => !v)}
+            className={`flex-1 text-xs font-bold py-2 rounded-xl ${filterOwned ? 'bg-white text-purple-600' : 'bg-white/20 text-white'}`}
+          >
+            {filterOwned ? '✓ Só minhas' : '👀 Só minhas'}
+          </button>
+        </div>
+      </div>
+
+      {/* Tabs de categoria */}
+      <div className="flex bg-gray-50 border-b border-gray-200 overflow-x-auto flex-shrink-0 scrollbar-hide">
+        {tabs.map(cat => (
+          <button
+            key={cat.id}
+            onClick={() => setActiveTab(cat.id)}
+            className={`flex-shrink-0 px-4 py-2.5 text-xs font-bold flex flex-col items-center gap-0.5 transition-colors ${
+              activeTab === cat.id
+                ? 'text-purple-700 border-b-2 border-purple-600 bg-white'
+                : 'text-gray-500'
+            }`}
+          >
+            <span className="text-lg">{cat.emoji}</span>
+            <span className="leading-none">{cat.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Conteúdo */}
+      <div className="flex-1 overflow-y-auto">
+        <AnimatePresence mode="wait">
+          {showProgress ? (
+            <motion.div key="progress"
+              initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }}
+            >
+              <ProgressPanel progress={progress} />
+            </motion.div>
+          ) : (
+            <motion.div key={activeTab}
+              initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}
+            >
+              <CategoryPage
+                categoryId={activeTab}
+                album={album}
+                onSelectSticker={setSelectedSticker}
+                filterOwned={filterOwned}
+              />
+            </motion.div>
           )}
-        </p>
-      </motion.div>
+        </AnimatePresence>
+      </div>
 
       {/* Modais */}
       <AnimatePresence>
         {selectedSticker && (
-          <StickerDetailModal sticker={selectedSticker} userSticker={selectedUserSticker} onClose={() => setSelectedSticker(null)} onPaste={handlePaste} onTrade={handleTrade} />
+          <StickerDetailModal
+            key="detail"
+            sticker={selectedSticker}
+            userSticker={getUserSticker(selectedSticker.id)}
+            onClose={() => setSelectedSticker(null)}
+            onPaste={handlePaste}
+            onGenerateTrade={handleGenerateTrade}
+          />
+        )}
+        {pasteAnim && (
+          <PasteAnimation
+            key="paste"
+            sticker={pasteAnim}
+            onDone={() => setPasteAnim(null)}
+          />
+        )}
+        {pageCompleteAnim && (
+          <PageCompleteAnimation
+            key="page-complete"
+            page={pageCompleteAnim}
+            onDone={() => setPageCompleteAnim(null)}
+          />
+        )}
+        {tradeCode && (
+          <TradeCodeModal
+            key="trade"
+            code={tradeCode.code}
+            sticker={tradeCode.sticker}
+            onClose={() => setTradeCode(null)}
+          />
+        )}
+        {showRedeem && (
+          <RedeemModal key="redeem" onClose={() => { setShowRedeem(false); refresh(); }} />
         )}
       </AnimatePresence>
-
-      <CodeModal isOpen={showCodeModal} onClose={() => { setShowCodeModal(false); setCodeError(''); }} mode="redeem" onSubmit={handleRedeemCode} />
-
-      <CodeModal isOpen={showTradeModal} onClose={() => { setShowTradeModal(false); setTradeCode(''); setTradeSticker(null); }} mode="trade" onSubmit={() => {}} tradeCode={tradeCode} tradeSticker={tradeSticker} />
-
-      <RewardModal reward={lastReward} onClose={closeRewardAnimation} />
     </div>
   );
 }
