@@ -82,7 +82,7 @@ export function StickerEarnedToast({ sticker, onDone, autoClose = 2800 }) {
  * Uso:
  *   const { showToast, StickerToast } = useStickerToast();
  *   showToast(result);  // result = retorno do earnSticker / addSticker
- *   return <>{StickerToast}</>;
+ *   return <><StickerToast /></>;
  */
 export function useStickerToast() {
   const [pending, setPending] = React.useState(null);
