@@ -11,36 +11,36 @@ import DribbleGame from '@/components/training/DribbleGame';
 import BallControlGame from '@/components/training/BallControlGame';
 import PursuitGame from '@/components/training/PursuitGame';
 
-// Larger modules (kept as lazy inline imports from the old Training file until extracted)
+// Larger modules
 import EnglishGame from '@/components/training/EnglishGame';
 import StoryGame from '@/components/training/StoryGame';
 import FundamentosGame from '@/components/training/FundamentosGame';
 import NotasGame from '@/components/training/NotasGame';
 import CopaGame from '@/components/training/CopaGame';
 import HistoriaFutebolGame from '@/components/training/HistoriaFutebolGame';
-import AlbumView from '@/components/training/AlbumView';
 import SaudeGame from '@/components/training/SaudeGame';
 import DiarioMenstrual from '@/components/training/DiarioMenstrual';
-  { id: 'penalty', label: 'Penalti', emoji: '⚽', desc: 'Chute nos 9 quadrantes - engane a goleira!', color: 'from-primary to-green-500', component: PenaltyGame },
-  { id: 'pass', label: 'Passe', emoji: '🎯', desc: 'Reação e timing perfeito', color: 'from-blue-500 to-blue-600', component: PassGame },
-  { id: 'dribble', label: 'Zig Zague', emoji: '⚡', desc: 'Zigue-zague pelos cones - bata a adversaria!', color: 'from-yellow-500 to-orange-500', component: DribbleGame },
-  { id: 'control', label: 'Condução', emoji: '🏃‍♀️', desc: 'Desvie das defensoras e avance!', color: 'from-teal-500 to-cyan-500', component: BallControlGame },
-  { id: 'pursuit', label: 'Drible c/ Marcador', emoji: '🔥', desc: 'Fuja da marcadora e chegue ao gol!', color: 'from-accent to-pink-500', component: PursuitGame },
-  { id: 'english', label: 'Inglês do Futebol', emoji: '🇺🇸', desc: '10 níveis · vocabulário · 50 figurinhas', color: 'from-blue-600 to-indigo-700', component: EnglishGame },
-  { id: 'story', label: 'Modo Carreira', emoji: '👑', desc: 'A jornada de uma jogadora!', color: 'from-rose-500 to-pink-600', component: StoryGame },
-  { id: 'fundamentos', label: 'Fundamentos', emoji: '📚', desc: 'Regras, posições e técnicas do futsal', color: 'from-green-600 to-emerald-700', component: FundamentosGame },
-  { id: 'notas', label: 'Notas Escolares', emoji: '📝', desc: 'Suas notas + melhores amigas', color: 'from-purple-500 to-violet-600', component: NotasGame },
-  { id: 'copa', label: 'Copa do Mundo', emoji: '🌍', desc: 'Tabela feminino e masculino', color: 'from-yellow-500 to-amber-600', component: CopaGame },
-  { id: 'futebolhistoria', label: 'História do Futebol', emoji: '🏛️', desc: 'Brasil, mundo e Futsal!', color: 'from-amber-600 to-orange-700', component: HistoriaFutebolGame },
-  { id: 'album', label: 'Álbum de Figurinhas', emoji: '📒', desc: 'Cole e troque figurinhas!', color: 'from-yellow-400 to-amber-500', component: AlbumView },
-  { id: 'saude', label: 'Saúde da Atleta', emoji: '💜', desc: 'Higiene, alimentação e bem-estar', color: 'from-pink-400 to-rose-500', component: SaudeGame },
-  { id: 'diario', label: 'Diário Menstrual', emoji: '🌸', desc: 'Registre seu ciclo e sintomas', color: 'from-rose-400 to-pink-600', component: DiarioMenstrual },
+
+const TRAINING_MODULES = [
+  { id: 'penalty',       label: 'Penalti',             emoji: '⚽',  desc: 'Chute nos 9 quadrantes - engane a goleira!',   color: 'from-primary to-green-500',     component: PenaltyGame },
+  { id: 'pass',          label: 'Passe',                emoji: '🎯',  desc: 'Reação e timing perfeito',                      color: 'from-blue-500 to-blue-600',      component: PassGame },
+  { id: 'dribble',       label: 'Zig Zague',            emoji: '⚡',  desc: 'Zigue-zague pelos cones - bata a adversaria!',  color: 'from-yellow-500 to-orange-500',  component: DribbleGame },
+  { id: 'control',       label: 'Condução',             emoji: '🏃‍♀️', desc: 'Desvie das defensoras e avance!',               color: 'from-teal-500 to-cyan-500',      component: BallControlGame },
+  { id: 'pursuit',       label: 'Drible c/ Marcador',   emoji: '🔥',  desc: 'Fuja da marcadora e chegue ao gol!',            color: 'from-accent to-pink-500',        component: PursuitGame },
+  { id: 'english',       label: 'Inglês do Futebol',    emoji: '🇺🇸', desc: '10 níveis · vocabulário · 50 figurinhas',       color: 'from-blue-600 to-indigo-700',    component: EnglishGame },
+  { id: 'story',         label: 'Modo Carreira',        emoji: '👑',  desc: 'A jornada de uma jogadora!',                    color: 'from-rose-500 to-pink-600',      component: StoryGame },
+  { id: 'fundamentos',   label: 'Fundamentos',          emoji: '📚',  desc: 'Regras, posições e técnicas do futsal',         color: 'from-green-600 to-emerald-700',  component: FundamentosGame },
+  { id: 'notas',         label: 'Notas Escolares',      emoji: '📝',  desc: 'Suas notas + melhores amigas',                  color: 'from-purple-500 to-violet-600',  component: NotasGame },
+  { id: 'copa',          label: 'Copa do Mundo',        emoji: '🌍',  desc: 'Tabela feminino e masculino',                   color: 'from-yellow-500 to-amber-600',   component: CopaGame },
+  { id: 'futebolhistoria',label: 'História do Futebol', emoji: '🏛️',  desc: 'Brasil, mundo e Futsal!',                       color: 'from-amber-600 to-orange-700',   component: HistoriaFutebolGame },
+  { id: 'saude',         label: 'Saúde da Atleta',      emoji: '💜',  desc: 'Higiene, alimentação e bem-estar',              color: 'from-pink-400 to-rose-500',      component: SaudeGame },
+  { id: 'diario',        label: 'Diário Menstrual',     emoji: '🌸',  desc: 'Registre seu ciclo e sintomas',                 color: 'from-rose-400 to-pink-600',      component: DiarioMenstrual },
 ];
 
 export default function Training() {
   const [active, setActive] = useState(null);
-  const [muted, setMuted] = useState(false);
-  const mod = active ? TRAINING_MODULES.find(m => m.id === active) : null;
+  const [muted, setMuted]   = useState(false);
+  const mod             = active ? TRAINING_MODULES.find(m => m.id === active) : null;
   const ActiveComponent = mod?.component || null;
 
   const handleBack = () => { bgMusic.stop(); setActive(null); };

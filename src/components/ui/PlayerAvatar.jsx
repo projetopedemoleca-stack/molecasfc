@@ -205,41 +205,277 @@ export function PlayerAvatar({ sticker, size = 56 }) {
   );
 }
 
-// ─── Bandeira oficial via flagcdn.com ─────────────────────────────────────────
-const FLAG_MAP = {
-  BR:'br', AR:'ar', CO:'co', CL:'cl', UY:'uy', PY:'py', EC:'ec',
-  VE:'ve', PE:'pe', BO:'bo', DE:'de', US:'us', GB:'gb-eng', FR:'fr',
-  ES:'es', NL:'nl', SE:'se', JP:'jp', AU:'au', NO:'no', IT:'it',
-  CN:'cn', KR:'kr', PT:'pt', CH:'ch', CA:'ca', MX:'mx', NZ:'nz',
-  ZA:'za', NG:'ng', CM:'cm', GH:'gh', KE:'ke', SN:'sn', EG:'eg',
-  DK:'dk', AT:'at', BE:'be', IE:'ie', RU:'ru', PL:'pl', PH:'ph',
-  TH:'th', VN:'vn', IN:'in', TW:'tw', ZM:'zm', CI:'ci', TN:'tn',
-  DZ:'dz', MA:'ma', UK:'gb',
-};
+// ─── Bandeiras SVG com cores reais ───────────────────────────────────────────
+function FlagSVG({ country, width, height }) {
+  const r = height / 3; // altura de cada faixa horizontal
+  const flags = {
+    BR: ( // Verde, amarelo losango, azul círculo
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        <rect width="3" height="2" fill="#009C3B"/>
+        <polygon points="1.5,0.15 2.85,1 1.5,1.85 0.15,1" fill="#FFDF00"/>
+        <circle cx="1.5" cy="1" r="0.55" fill="#002776"/>
+        <line x1="0.97" y1="0.72" x2="2.03" y2="1.28" stroke="white" strokeWidth="0.07"/>
+      </svg>
+    ),
+    AR: ( // Azul celeste, branco, azul celeste + sol
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        <rect width="3" height="2" fill="#74ACDF"/>
+        <rect y="0.67" width="3" height="0.66" fill="white"/>
+        <circle cx="1.5" cy="1" r="0.22" fill="#F6B40E"/>
+      </svg>
+    ),
+    US: ( // Barras vermelhas e brancas + azul com estrelas
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        {[0,1,2,3,4,5,6,7,8,9,10,11,12].map(i => (
+          <rect key={i} x="0" y={i*2/13} width="3" height={2/13} fill={i%2===0 ? '#B22234' : 'white'}/>
+        ))}
+        <rect width="1.2" height={7*2/13} fill="#3C3B6E"/>
+      </svg>
+    ),
+    DE: ( // Preto, vermelho, dourado
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        <rect width="3" height="2" fill="#FFCE00"/>
+        <rect width="3" height={r*2} fill="#000000"/>
+        <rect y={r} width="3" height={r} fill="#DD0000"/>
+      </svg>
+    ),
+    ES: ( // Vermelho, amarelo, vermelho
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        <rect width="3" height="2" fill="#AA151B"/>
+        <rect y="0.5" width="3" height="1" fill="#F1BF00"/>
+      </svg>
+    ),
+    FR: ( // Azul, branco, vermelho vertical
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        <rect width="3" height="2" fill="#EF4135"/>
+        <rect width="2" height="2" fill="white"/>
+        <rect width="1" height="2" fill="#002395"/>
+      </svg>
+    ),
+    GB: ( // Vermelho e branco (Cruz de Santo André + Cruz de São Jorge)
+      <svg width={width} height={height} viewBox="0 0 6 3">
+        <rect width="6" height="3" fill="#012169"/>
+        <path d="M0,0 L6,3 M6,0 L0,3" stroke="white" strokeWidth="0.6"/>
+        <path d="M0,0 L6,3 M6,0 L0,3" stroke="#C8102E" strokeWidth="0.4"/>
+        <rect x="2.5" width="1" height="3" fill="white"/>
+        <rect y="1" width="6" height="1" fill="white"/>
+        <rect x="2.67" width="0.67" height="3" fill="#C8102E"/>
+        <rect y="1.17" width="6" height="0.67" fill="#C8102E"/>
+      </svg>
+    ),
+    NL: ( // Vermelho, branco, azul
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        <rect width="3" height="2" fill="#21468B"/>
+        <rect width="3" height={r*2} fill="#AE1C28"/>
+        <rect y={r} width="3" height={r} fill="white"/>
+      </svg>
+    ),
+    SE: ( // Azul com cruz amarela
+      <svg width={width} height={height} viewBox="0 0 8 5">
+        <rect width="8" height="5" fill="#006AA7"/>
+        <rect x="2" width="1.5" height="5" fill="#FECC02"/>
+        <rect y="2" width="8" height="1.5" fill="#FECC02"/>
+      </svg>
+    ),
+    JP: ( // Branco com círculo vermelho
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        <rect width="3" height="2" fill="white"/>
+        <circle cx="1.5" cy="1" r="0.6" fill="#BC002D"/>
+      </svg>
+    ),
+    AU: ( // Azul com Union Jack + estrelas
+      <svg width={width} height={height} viewBox="0 0 6 3">
+        <rect width="6" height="3" fill="#00008B"/>
+        <rect x="0" width="3" height="1.5" fill="#012169"/>
+        <path d="M0,0 L3,1.5 M3,0 L0,1.5" stroke="white" strokeWidth="0.4"/>
+        <path d="M0,0 L3,1.5 M3,0 L0,1.5" stroke="#C8102E" strokeWidth="0.25"/>
+        <rect x="1.25" width="0.5" height="1.5" fill="white"/>
+        <rect y="0.5" x="0" width="3" height="0.5" fill="white"/>
+        <rect x="1.33" width="0.33" height="1.5" fill="#C8102E"/>
+        <rect y="0.58" width="3" height="0.33" fill="#C8102E"/>
+        <polygon points="4.5,0.3 4.65,0.75 5.1,0.75 4.72,1 4.88,1.45 4.5,1.2 4.12,1.45 4.28,1 3.9,0.75 4.35,0.75" fill="white" transform="scale(0.5) translate(4,0)"/>
+      </svg>
+    ),
+    IT: ( // Verde, branco, vermelho vertical
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        <rect width="3" height="2" fill="#CE2B37"/>
+        <rect width="2" height="2" fill="white"/>
+        <rect width="1" height="2" fill="#009246"/>
+      </svg>
+    ),
+    PT: ( // Verde e vermelho + escudo
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        <rect width="3" height="2" fill="#FF0000"/>
+        <rect width="1.2" height="2" fill="#006600"/>
+        <circle cx="1.2" cy="1" r="0.32" fill="#FFFF00"/>
+      </svg>
+    ),
+    NO: ( // Vermelho, cruz branca e azul
+      <svg width={width} height={height} viewBox="0 0 22 16">
+        <rect width="22" height="16" fill="#EF2B2D"/>
+        <rect x="6" width="4" height="16" fill="white"/>
+        <rect y="6" width="22" height="4" fill="white"/>
+        <rect x="7" width="2" height="16" fill="#002868"/>
+        <rect y="7" width="22" height="2" fill="#002868"/>
+      </svg>
+    ),
+    CN: ( // Vermelho com estrelas amarelas
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        <rect width="3" height="2" fill="#DE2910"/>
+        <polygon points="0.4,0.2 0.5,0.5 0.2,0.3 0.6,0.3 0.3,0.5" fill="#FFDE00"/>
+        <polygon points="0.8,0.1 0.85,0.25 0.7,0.15 0.9,0.15 0.75,0.25" fill="#FFDE00"/>
+        <polygon points="0.95,0.28 1,0.43 0.85,0.33 1.05,0.33 0.9,0.43" fill="#FFDE00"/>
+        <polygon points="0.95,0.55 1,0.7 0.85,0.6 1.05,0.6 0.9,0.7" fill="#FFDE00"/>
+        <polygon points="0.8,0.75 0.85,0.9 0.7,0.8 0.9,0.8 0.75,0.9" fill="#FFDE00"/>
+      </svg>
+    ),
+    KR: ( // Branco com taeguk e trigramas
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        <rect width="3" height="2" fill="white"/>
+        <circle cx="1.5" cy="1" r="0.45" fill="#CD2E3A"/>
+        <path d="M1.5,0.55 A0.45,0.45 0 0,1 1.5,1.45" fill="#003478"/>
+        <circle cx="1.5" cy="0.775" r="0.225" fill="#CD2E3A"/>
+        <circle cx="1.5" cy="1.225" r="0.225" fill="#003478"/>
+      </svg>
+    ),
+    CO: ( // Amarelo, azul, vermelho horizontal
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        <rect width="3" height="2" fill="#CE1126"/>
+        <rect width="3" height={r*2} fill="#FCD116"/>
+        <rect y={r} width="3" height={r/2} fill="#003087"/>
+      </svg>
+    ),
+    CL: ( // Vermelho, branco com estrela e azul
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        <rect width="3" height="2" fill="#D52B1E"/>
+        <rect width="3" height="1" fill="white"/>
+        <rect width="1" height="1" fill="#0039A6"/>
+        <polygon points="0.5,0.15 0.6,0.45 0.85,0.3 0.6,0.5 0.85,0.7 0.6,0.55 0.5,0.85 0.4,0.55 0.15,0.7 0.4,0.5 0.15,0.3 0.4,0.45" fill="white"/>
+      </svg>
+    ),
+    UY: ( // Branco e azul com sol
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        {[0,1,2,3,4,5,6,7,8].map(i => (
+          <rect key={i} x="0" y={i*2/9} width="3" height={2/9} fill={i%2===0 ? 'white' : '#5EB6E4'}/>
+        ))}
+        <circle cx="0.6" cy="0.6" r="0.35" fill="#F9B32F"/>
+      </svg>
+    ),
+    MX: ( // Verde, branco, vermelho + águia
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        <rect width="3" height="2" fill="#CE1126"/>
+        <rect width="2" height="2" fill="white"/>
+        <rect width="1" height="2" fill="#006847"/>
+        <circle cx="1.5" cy="1" r="0.25" fill="#006847" opacity="0.5"/>
+      </svg>
+    ),
+    NG: ( // Verde, branco, verde
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        <rect width="3" height="2" fill="white"/>
+        <rect width="1" height="2" fill="#008751"/>
+        <rect x="2" width="1" height="2" fill="#008751"/>
+      </svg>
+    ),
+    ZA: ( // 6 cores + Y horizontal
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        <rect width="3" height="2" fill="#007A4D"/>
+        <polygon points="0,0 1.2,1 0,2" fill="black"/>
+        <polygon points="0,0 1.05,1 0,2 0,0.2 0.9,1 0,1.8" fill="#FFB612"/>
+        <rect y="0" width="3" height="0.5" fill="#DE3831"/>
+        <rect y="1.5" width="3" height="0.5" fill="#002395"/>
+        <rect y="0.5" width="3" height="0.2" fill="white"/>
+        <rect y="1.3" width="3" height="0.2" fill="white"/>
+      </svg>
+    ),
+    DK: ( // Vermelho com cruz branca
+      <svg width={width} height={height} viewBox="0 0 37 28">
+        <rect width="37" height="28" fill="#C60C30"/>
+        <rect x="12" width="5" height="28" fill="white"/>
+        <rect y="11.5" width="37" height="5" fill="white"/>
+      </svg>
+    ),
+    AT: ( // Vermelho, branco, vermelho
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        <rect width="3" height="2" fill="#ED2939"/>
+        <rect y="0.67" width="3" height="0.66" fill="white"/>
+      </svg>
+    ),
+    BE: ( // Preto, amarelo, vermelho vertical
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        <rect width="3" height="2" fill="#EF3340"/>
+        <rect width="2" height="2" fill="#FAE042"/>
+        <rect width="1" height="2" fill="#000000"/>
+      </svg>
+    ),
+    PH: ( // Azul, vermelho, branco triângulo + sol
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        <rect width="3" height="2" fill="#CE1126"/>
+        <rect width="3" height="1" fill="#0038A8"/>
+        <polygon points="0,0 0,2 1.2,1" fill="white"/>
+        <circle cx="0.5" cy="1" r="0.2" fill="#FCD116"/>
+      </svg>
+    ),
+    IE: ( // Verde, branco, laranja
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        <rect width="3" height="2" fill="#FF883E"/>
+        <rect width="2" height="2" fill="white"/>
+        <rect width="1" height="2" fill="#169B62"/>
+      </svg>
+    ),
+    PL: ( // Branco e vermelho
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        <rect width="3" height="2" fill="#DC143C"/>
+        <rect width="3" height="1" fill="white"/>
+      </svg>
+    ),
+    GH: ( // Vermelho, ouro, verde com estrela preta
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        <rect width="3" height="2" fill="#006B3F"/>
+        <rect width="3" height={r*2} fill="#CF0921"/>
+        <rect y={r} width="3" height={r} fill="#FCD116"/>
+        <polygon points="1.5,0.55 1.6,0.85 1.9,0.85 1.65,1.05 1.75,1.35 1.5,1.15 1.25,1.35 1.35,1.05 1.1,0.85 1.4,0.85" fill="black"/>
+      </svg>
+    ),
+    MA: ( // Vermelho com estrela verde
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        <rect width="3" height="2" fill="#C1272D"/>
+        <polygon points="1.5,0.4 1.62,0.8 2.0,0.8 1.69,1.0 1.81,1.4 1.5,1.18 1.19,1.4 1.31,1.0 1.0,0.8 1.38,0.8" fill="none" stroke="#006233" strokeWidth="0.07"/>
+      </svg>
+    ),
+    EG: ( // Vermelho, branco, preto + águia
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        <rect width="3" height="2" fill="#000000"/>
+        <rect width="3" height={r*2} fill="#CE1126"/>
+        <rect y={r} width="3" height={r} fill="white"/>
+        <circle cx="1.5" cy="1" r="0.2" fill="#C09300" opacity="0.6"/>
+      </svg>
+    ),
+  };
+
+  const flag = flags[country];
+  if (!flag) {
+    // Fallback: duas cores do mapa de jerseys
+    return (
+      <svg width={width} height={height} viewBox="0 0 3 2">
+        <rect width="3" height="2" fill="#6d28d9"/>
+        <rect y="0.67" width="3" height="0.66" fill="#ec4899"/>
+      </svg>
+    );
+  }
+  return flag;
+}
 
 export function FlagBadge({ country, size = 48 }) {
-  const code = FLAG_MAP[country] || (country ? country.toLowerCase() : null);
-  if (!code) return <span style={{ fontSize: size * 0.6 }}>🏳️</span>;
-
+  const h = Math.round(size * 0.67);
   return (
     <div style={{
-      width: size, height: Math.round(size * 0.67),
+      width: size, height: h,
       borderRadius: 5, overflow: 'hidden',
-      border: '1.5px solid rgba(0,0,0,0.15)',
+      border: '1.5px solid rgba(0,0,0,0.18)',
       display: 'inline-block',
-      boxShadow: '0 1px 4px rgba(0,0,0,0.18)',
+      boxShadow: '0 1px 5px rgba(0,0,0,0.22)',
     }}>
-      <img
-        src={`https://flagcdn.com/w${size * 2}/${code}.png`}
-        alt={country}
-        width={size}
-        height={Math.round(size * 0.67)}
-        style={{ display: 'block', objectFit: 'cover' }}
-        onError={e => {
-          e.target.parentElement.innerHTML =
-            `<span style="font-size:${Math.round(size*0.55)}px;display:flex;align-items:center;justify-content:center;height:100%">🏳️</span>`;
-        }}
-      />
+      <FlagSVG country={country} width={size} height={h} />
     </div>
   );
 }
