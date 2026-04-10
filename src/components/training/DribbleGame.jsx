@@ -1,823 +1,633 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { RotateCcw } from 'lucide-react';
-import { bgMusic } from '@/lib/trainingMusic';
-import { audio } from '@/lib/audioEngine';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { motion } from 'framer-motion';
 
-// ─── Configuração de bolas ───────────────────────────────────────────────────
-const BALLS = [
-  { id: 'boneca', name: 'Cabeça de Boneca', emoji: '👧', desc: 'Leve e imprevisível' },
-  { id: 'lata', name: 'Lata', emoji: '🥫', desc: 'Pesada e reta' },
-  { id: 'pedra', name: 'Pedra', emoji: '🪨', desc: 'Muito pesada' },
-  { id: 'papel', name: 'Papel Amassado', emoji: '📄', desc: 'Leve e flutuante' },
-  { id: 'garrafinha', name: 'Garrafinha', emoji: '🍼', desc: 'Equilibrada' },
-  { id: 'limao', name: 'Limão', emoji: '🍋', desc: 'Irregular' },
-  { id: 'tampinha', name: 'Tampinha', emoji: '🪙', desc: 'Muito leve' },
+// ─── Configuração de bolas ───────────────────────────────────────────────
+const BALL_TYPES = [
+  { id: 'head',   name: 'Cabeça de Boneca', emoji: '🧠', speed: 0.95, desc: 'Leve, imprevisível' },
+  { id: 'can',      name: 'Lata',         emoji: '🥫', speed: 0.8,  desc: 'Pesada e reta' },
+  { id: 'stone',  name: 'Pedra',        emoji: '🪨', speed: 0.6,  desc: 'Muito pesada' },
+  { id: 'paper',  name: 'Papel Amassado', emoji: '📄', speed: 1.1,  desc: 'Leve e flutuante' },
+  { id: 'bottle', name: 'Garrafinha',   emoji: '🍼', speed: 1.0,  desc: 'Equilibrada' },
+  { id: 'lemon',  name: 'Limão',        emoji: '🍋', speed: 1.0,  desc: 'Irregular' },
+  { id: 'cap',     name: 'Tampinha',   emoji: '🪙', speed: 1.05, desc: 'Muito leve' },
 ];
 
-// ─── Configuração de obstáculos ──────────────────────────────────────────────
-const OBSTACLES = [
-  { id: 'cachorro', name: 'Cachorrinho Correndo', emoji: '🐕', desc: 'Corre de um lado pro outro' },
-  { id: 'carro', name: 'Carro Estacionado', emoji: '🚗', desc: 'Bloqueia o caminho' },
+// ─── Configuração de obstáculos de rua ─────────────────────────────────────
+const OBSTACLE_TYPES = [
+  { id: 'dog',    name: 'Cachorrinho', emoji: '🐕', behavior: 'patrol', desc: 'Corre de um lado pro outro' },
+  { id: 'car',    name: 'Carro Estacionado', emoji: '🚗', behavior: 'static', desc: 'Bloqueia o caminho' },
+  { id: 'cat',    name: 'Gato',         emoji: '🐱', behavior: 'patrol', desc: 'Passa pelo meio' },
+  { id: 'bike',   name: 'Bicicleta',     emoji: '🚲', behavior: 'parked', desc: 'Estacionada no canto' },
+  { id: 'bin',     name: 'Lixeira',       emoji: '🗑️', behavior: 'static', desc: 'Obstáculo fixo' },
 ];
 
-// ─── Configuração de níveis ───────────────────────────────────────────────────
+// ─── Configuração de níveis ───────────────────────────────────────────────
 const LEVELS = [
-  { label: 'Nível 1', emoji: '🌱', speed: 1, obstacles: 1, desc: 'Obstáculo lento' },
-  { label: 'Nível 2', emoji: '⚡', speed: 1.5, obstacles: 2, desc: 'Obstáculo mais rápido' },
-  { label: 'Nível 3', emoji: '🎲', speed: 2, obstacles: 2, desc: 'Muito rápido!' },
-  { label: 'Nível 4', emoji: '🌀', speed: 2.5, obstacles: 3, desc: 'Múltiplos obstáculos' },
-  { label: 'Nível 5', emoji: '👻', speed: 3, obstacles: 3, desc: 'Velocidade máxima!' },
+  { label: 'Nível 1', time: 60, goals: 3, obstacles: 1, botSpeed: 0.7, desc: 'Futebol de rua calmo' },
+  { label: 'Nível 2', time: 55, goals: 4, obstacles: 2, botSpeed: 0.9, desc: 'Cuidado com os cachorros!' },
+  { label: 'Nível 3', time: 50, goals: 5, obstacles: 3, botSpeed: 1.1, desc: 'Mais obstáculos na rua!' },
+  { label: 'Nível 4', time: 45, goals: 5, obstacles: 3, botSpeed: 1.3, desc: 'Velocidade aumentando!' },
+  { label: '5', time: 40, goals: 6, obstacles: 4, botSpeed: 1.6, desc: 'Fim de semana na rua!' },
 ];
 
-const SIZE = 8;
-const MAX_ATTEMPTS = 3;
+// Dimensões do campo
+const FIELD_W = 320;
+const FIELD_H = 480;
+const GOAL_WIDTH = 60;
+const GOAL_HEIGHT = 50;
+const PLAYER_SIZE = 18;
+const BALL_SIZE = 12;
+const OBSTACLE_SIZE = 20;
 
-// ─── Campo SVG ────────────────────────────────────────────────────────────────
-const CELL = 45;
-const W = SIZE * CELL;
-const H = SIZE * CELL + 60; // +60 = área dos gols
+function distance(a, b) { return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2); }
 
-function StreetField({ px, py, ball, obstacles, done, won, goalSide }) {
-  const isLeftGoal = goalSide === 'left';
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block', maxHeight: 400 }}>
-      <defs>
-        <linearGradient id="street" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#64748b"/>
-          <stop offset="100%" stopColor="#475569"/>
-        </linearGradient>
-        <pattern id="asphalt" width={CELL/2} height={CELL/2} patternUnits="userSpaceOnUse">
-          <rect width={CELL/2} height={CELL/2} fill="rgba(0,0,0,0.1)"/>
-          <rect x={CELL/4} width={CELL/4} height={CELL/4} fill="rgba(0,0,0,0.05)"/>
-        </pattern>
-        <filter id="glow"><feGaussianBlur stdDeviation="2" result="b"/>
-          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-      </defs>
-
-      {/* Asfalto */}  
-      <rect width={W} height={H} fill="url(#street)"/>
-      <rect width={W} height={H} fill="url(#asphalt)"/>
-
-      {/* Gols pequenos */}
-      <rect x={0} y={0} width={CELL*2} height={CELL*1.5} fill="rgba(255,255,255,0.9)" stroke="#000" strokeWidth={2}/>
-      <text x={CELL} y={CELL*0.8} textAnchor="middle" fontSize={12} fill="#000" fontWeight="bold">🏁</text>
-      <text x={CELL} y={CELL*1.2} textAnchor="middle" fontSize={8} fill="#000">GOL</text>
-
-      <rect x={W-CELL*2} y={H-CELL*1.5} width={CELL*2} height={CELL*1.5} fill="rgba(255,255,255,0.9)" stroke="#000" strokeWidth={2}/>
-      <text x={W-CELL} y={H-CELL*0.2} textAnchor="middle" fontSize={12} fill="#000" fontWeight="bold">🏁</text>
-      <text x={W-CELL} y={H-CELL*0.6} textAnchor="middle" fontSize={8} fill="#000">GOL</text>
-
-      {/* Grade */}
-      {Array.from({length: SIZE + 1}, (_, i) => (
-        <React.Fragment key={i}>
-          <line x1={i*CELL} y1={0} x2={i*CELL} y2={H} stroke="rgba(255,255,255,0.1)" strokeWidth={0.5}/>
-          <line x1={0} y1={i*CELL} x2={W} y2={i*CELL} stroke="rgba(255,255,255,0.1)" strokeWidth={0.5}/>
-        </React.Fragment>
-      ))}
-
-      {/* Obstáculos */}
-      {obstacles.map((obs, i) => {
-        if (obs.type === 'carro') {
-          return (
-            <g key={i}>
-              <rect x={obs.x*CELL + 5} y={obs.y*CELL + 5} width={CELL-10} height={CELL-10} 
-                fill="#374151" stroke="#1f2937" strokeWidth={1} rx={3}/>
-              <text x={obs.x*CELL + CELL/2} y={obs.y*CELL + CELL/2 + 5} 
-                textAnchor="middle" fontSize={16}>🚗</text>
-            </g>
-          );
-        } else if (obs.type === 'cachorro') {
-          return (
-            <motion.g key={i}
-              animate={{ x: [obs.x*CELL + CELL/2 - 10, obs.x*CELL + CELL/2 + 10, obs.x*CELL + CELL/2 - 10] }}
-              transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}>
-              <circle cx={obs.x*CELL + CELL/2} cy={obs.y*CELL + CELL/2} r={CELL*0.3} 
-                fill="#fbbf24" stroke="#f59e0b" strokeWidth={2}/>
-              <text x={obs.x*CELL + CELL/2} y={obs.y*CELL + CELL/2 + 5} 
-                textAnchor="middle" fontSize={16}>🐕</text>
-            </motion.g>
-          );
-        }
-        return null;
-      })}
-
-      {/* Jogadora */}
-      <motion.g filter="url(#glow)"
-        animate={{ scale: [1, 1.1, 1] }}
-        transition={{ repeat: Infinity, duration: 1.2 }}>
-        <circle cx={px*CELL + CELL/2} cy={py*CELL + CELL/2} r={CELL*0.35}
-          fill={done && won ? '#86efac' : done ? '#fca5a5' : '#fde68a'}
-          stroke={done && won ? '#22c55e' : done ? '#ef4444' : '#f59e0b'}
-          strokeWidth={2}/>
-        <text x={px*CELL + CELL/2} y={py*CELL + CELL/2 + 6}
-          textAnchor="middle" fontSize={18}>{ball.emoji}</text>
-      </motion.g>
-
-      {/* Meta atingida */}
-      {done && won && (
-        <motion.text
-          x={isLeftGoal ? CELL : W - CELL}
-          y={isLeftGoal ? CELL * 0.8 : H - CELL * 0.2}
-          textAnchor="middle"
-          fontSize={24}
-          fill="#22c55e"
-          fontWeight="bold"
-          initial={{ scale: 0 }}
-          animate={{ scale: [0, 1.5, 1] }}
-          transition={{ duration: 0.5 }}>
-          ⚽
-        </motion.text>
-      )}
-    </svg>
-  );
-}
-
-// ─── Principal ────────────────────────────────────────────────────────────────
-export default function DribbleGame() {
-  useEffect(() => { bgMusic.play('street'); return () => bgMusic.stop(); }, []);
-
-  const [phase, setPhase] = useState('menu'); // menu | ball-select | obstacle-select | playing | result
-  const [selectedBall, setSelectedBall] = useState(BALLS[0]);
-  const [selectedObstacle, setSelectedObstacle] = useState(OBSTACLES[0]);
-  const [levelIdx, setLevelIdx] = useState(0);
-  const [px, setPx] = useState(SIZE - 2);
-  const [py, setPy] = useState(SIZE - 1);
-  const [obstacles, setObstacles] = useState([]);
-  const [done, setDone] = useState(false);
-  const [won, setWon] = useState(false);
+export default function DribbleGame({ onStickerEarned }) {
+  const [phase, setPhase] = useState('menu');
+  const [level, setLevel] = useState(0);
   const [score, setScore] = useState(0);
-  const [attempts, setAttempts] = useState(0);
-  const [goalSide, setGoalSide] = useState('left'); // 'left' or 'right'
-  const [unlocked, setUnlocked] = useState(0);
+  const [lives, setLives] = useState(3);
+  const [goals, setGoals] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(0);
 
-  const cfg = LEVELS[Math.min(levelIdx, LEVELS.length - 1)];
+  // Seleção
+  const [selectedBall, setSelectedBall] = useState(BALL_TYPES[0]);
+  const [selectedObstacles, setSelectedObstacles] = useState([]);
+  const [playerPos, setPlayerPos] = useState({ x: FIELD_W / 2, y: FIELD_H - 50 });
+  const [botPos, setBotPos] = useState({ x: FIELD_W / 2, y: 50 });
+  const [obstaclePositions, setObstaclePositions] = useState([]);
+  const [velocity, setVelocity] = useState({ x: 0, y: 0 });
+  const [gameOver, setGameOver] = useState(false);
+  const playerStart = useRef({ x: FIELD_W / 2, y: FIELD_H - 50 });
+  const velocityRef = useRef({ x: 0, y: 0 });
+  const loopRef = useRef(null);
+  const config = LEVELS[level] || LEVELS[0];
 
-  // ─── Gerar obstáculos ───────────────────────────────────────────────────────
+  // ─── Gerar obstáculos ─────────────────────────────────────────────────────
   const generateObstacles = useCallback(() => {
-    const obs = [];
-    const blocked = new Set();
-
-    // Bloquear áreas dos gols
-    for (let x = 0; x < 2; x++) {
-      for (let y = 0; y < 2; y++) {
-        blocked.add(`${x},${y}`);
-        blocked.add(`${SIZE-2+x},${SIZE-2+y}`);
-      }
+    const newObstacles = [];
+    const count = config.obstacles + 1;
+    for (let i = 0; i < count; i++) {
+      const type = OBSTACLE_TYPES[i % OBSTACLE_TYPES.length];
+      const isTop = i < 2;
+      const x = 30 + Math.random() * (FIELD_W - 60);
+      const y = isTop ? 50 + Math.random() * 100 : 280 + Math.random() * (FIELD_H - 280);
+      newObstacles.push({
+        id: i,
+        type,
+        x,
+        y,
+        dir: 1,
+        speed: 0.5 + Math.random() * 0.5
+      });
     }
+    setObstaclePositions(newObstacles);
+  }, [config.obstacles]);
 
-    // Jogadora inicial
-    blocked.add(`${SIZE-2},${SIZE-1}`);
-
-    for (let i = 0; i < cfg.obstacles; i++) {
-      let tries = 0;
-      let placed = false;
-
-      while (!placed && tries < 50) {
-        tries++;
-        const x = Math.floor(Math.random() * SIZE);
-        const y = Math.floor(Math.random() * SIZE);
-        const key = `${x},${y}`;
-
-        if (!blocked.has(key)) {
-          obs.push({
-            x, y,
-            type: selectedObstacle.id,
-            id: i
-          });
-          blocked.add(key);
-          placed = true;
-        }
-      }
-    }
-
-    return obs;
-  }, [cfg.obstacles, selectedObstacle.id]);
-
-  // ─── Iniciar rodada ─────────────────────────────────────────────────────────
-  const startRound = useCallback((att = 0, sc = 0) => {
-    const newObstacles = generateObstacles();
-    const newGoalSide = Math.random() < 0.5 ? 'left' : 'right';
-
-    setPx(SIZE - 2);
-    setPy(SIZE - 1);
-    setObstacles(newObstacles);
-    setGoalSide(newGoalSide);
-    setDone(false);
-    setWon(false);
-    setAttempts(att);
-    setScore(sc);
+  // ─── Iniciar jogo ────────────────────────────────────────────────────────
+  const startGame = () => {
     setPhase('playing');
-  }, [generateObstacles]);
-
-  // ─── Mover jogadora ─────────────────────────────────────────────────────────
-  const move = useCallback((dx, dy) => {
-    if (done || phase !== 'playing') return;
-
-    const nx = Math.max(0, Math.min(SIZE - 1, px + dx));
-    const ny = Math.max(0, Math.min(SIZE - 1, py + dy));
-
-    // Verificar obstáculos
-    const hitObstacle = obstacles.some(obs => obs.x === nx && obs.y === ny);
-    if (hitObstacle) {
-      try { audio.playLose?.(); } catch {}
-      setDone(true);
-      setWon(false);
-      const newAtt = attempts + 1;
-      setAttempts(newAtt);
-      if (newAtt >= MAX_ATTEMPTS) {
-        setTimeout(() => setPhase('result'), 800);
-      } else {
-        setTimeout(() => startRound(newAtt, score), 800);
-      }
-      return;
-    }
-
-    setPx(nx);
-    setPy(ny);
-    try { audio.playDribble?.(); } catch {}
-
-    // Verificar gol
-    const reachedGoal = (goalSide === 'left' && nx < 2 && ny < 2) || 
-                       (goalSide === 'right' && nx >= SIZE - 2 && ny >= SIZE - 2);
-
-    if (reachedGoal) {
-      const newScore = score + 1;
-      setScore(newScore);
-      setWon(true);
-      setDone(true);
-      try { audio.playGoal?.(); } catch {}
-
-      const newAtt = attempts + 1;
-      setAttempts(newAtt);
-      if (newAtt >= MAX_ATTEMPTS) {
-        setTimeout(() => {
-          if (newScore >= 2) setUnlocked(u => Math.max(u, levelIdx + 1));
-          setPhase('result');
-        }, 900);
-      } else {
-        setTimeout(() => startRound(newAtt, newScore), 900);
-      }
-    }
-  }, [px, py, obstacles, done, phase, goalSide, attempts, score, levelIdx, startRound]);
-
-  // ─── Teclado ────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const h = (e) => {
-      if (e.key === 'ArrowUp')    { e.preventDefault(); move(0, -1); }
-      if (e.key === 'ArrowDown')  { e.preventDefault(); move(0,  1); }
-      if (e.key === 'ArrowLeft')  move(-1, 0);
-      if (e.key === 'ArrowRight') move( 1, 0);
-    };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [move]);
-
-  // ─── Swipe ──────────────────────────────────────────────────────────────────
-  const touch = useRef(null);
-  const onTouchStart = (e) => { touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; };
-  const onTouchEnd = (e) => {
-    if (!touch.current) return;
-    const dx = e.changedTouches[0].clientX - touch.current.x;
-    const dy = e.changedTouches[0].clientY - touch.current.y;
-    touch.current = null;
-    if (Math.abs(dy) > Math.abs(dx)) { move(0, dy < 0 ? -1 : 1); return; }
-    if (Math.abs(dx) > 8) move(dx < 0 ? -1 : 1, 0);
+    setLevel(0);
+    setScore(0);
+    setLives(3);
+    setGoals(0);
+    setTimeLeft(config.time);
+    setPlayerPos({ x: FIELD_W / 2, y: FIELD_H - 50 });
+    setBotPos({ x: FIELD_W / 2, y: 50 });
+    playerStart.current = { x: FIELD_W / 2, y: FIELD_H - 50 };
+    velocityRef.current = { x: 0, y: 0 };
+    setVelocity({ x: 0, y: 0 });
+    generateObstacles();
+    setGameOver(false);
   };
 
-  // ─── MENU INICIAL ───────────────────────────────────────────────────────────
-  if (phase === 'menu') return (
-    <div className="space-y-5">
-      <div className="text-center">
-        <motion.div className="text-5xl mb-2"
-          animate={{ rotate: [0, -10, 10, 0] }} transition={{ repeat: Infinity, duration: 0.8 }}>
-          ⚽
-        </motion.div>
-        <h2 className="font-heading font-black text-2xl">Fut de Rua 1x1</h2>
-        <p className="text-muted-foreground text-sm mt-1">
-          Escolha sua bola e chegue no gol do outro lado da rua!
-        </p>
-      </div>
-
-      <div className="grid grid-cols-3 gap-2 text-center">
-        {[
-          { icon:'⚽', text:'Chegue no gol\ndo outro lado' },
-          { icon:'🚗', text:'Evite carros\ne cachorros' },
-          { icon:'🏃', text:'Fuja e desviei\npela rua!' },
-        ].map((item, i) => (
-          <div key={i} className="bg-card border border-border/30 rounded-2xl p-3 space-y-1">
-            <div className="text-2xl">{item.icon}</div>
-            <p className="text-xs text-muted-foreground leading-tight whitespace-pre-line">{item.text}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Seleção de nível */}
-      <div className="space-y-2">
-        <p className="text-xs font-bold text-muted-foreground uppercase">Nível</p>
-        <div className="grid grid-cols-3 gap-2">
-          {LEVELS.map((lvl, i) => {
-            const ok = i <= unlocked;
-            return (
-              <button key={i} disabled={!ok} onClick={() => setLevelIdx(i)}
-                className={`py-2 px-1 rounded-xl text-xs font-bold border-2 transition-all ${
-                  levelIdx === i
-                    ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                    : ok
-                    ? 'bg-card border-border/30 hover:border-primary/50'
-                    : 'opacity-25 cursor-not-allowed border-border/20'
-                }`}>
-                {ok ? lvl.emoji : '🔒'} {lvl.label}
-              </button>
-            );
-          })}
-        </div>
-        <div className="bg-muted/30 rounded-xl p-3 text-center">
-          <p className="font-bold text-sm">{cfg.emoji} {cfg.label}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{cfg.desc}</p>
-        </div>
-      </div>
-
-      <motion.button whileTap={{ scale: 0.95 }}
-        onClick={() => setPhase('ball-select')}
-        className="w-full py-5 rounded-3xl font-heading font-black text-xl text-white shadow-xl"
-        style={{ background: 'linear-gradient(135deg,#f59e0b,#ef4444)' }}>
-        ▶ Escolher Bola!
-      </motion.button>
-    </div>
-  );
-
-  // ─── SELEÇÃO DE BOLA ────────────────────────────────────────────────────────
-  if (phase === 'ball-select') return (
-    <div className="space-y-5">
-      <div className="text-center">
-        <h2 className="font-heading font-black text-2xl">Escolha sua Bola</h2>
-        <p className="text-muted-foreground text-sm mt-1">
-          Cada bola tem características diferentes!
-        </p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        {BALLS.map((ball) => (
-          <motion.button
-            key={ball.id}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => { setSelectedBall(ball); setPhase('obstacle-select'); }}
-            className={`p-4 rounded-2xl border-2 transition-all text-center ${
-              selectedBall.id === ball.id
-                ? 'border-primary bg-primary/10 shadow-md'
-                : 'border-border/30 bg-card hover:border-primary/50'
-            }`}
-          >
-            <div className="text-3xl mb-2">{ball.emoji}</div>
-            <p className="font-bold text-sm">{ball.name}</p>
-            <p className="text-xs text-muted-foreground mt-1">{ball.desc}</p>
-          </motion.button>
-        ))}
-      </div>
-
-      <motion.button whileTap={{ scale: 0.95 }}
-        onClick={() => setPhase('menu')}
-        className="w-full py-3 rounded-xl font-bold bg-muted text-muted-foreground">
-        ← Voltar
-      </motion.button>
-    </div>
-  );
-
-  // ─── SELEÇÃO DE OBSTÁCULO ───────────────────────────────────────────────────
-  if (phase === 'obstacle-select') return (
-    <div className="space-y-5">
-      <div className="text-center">
-        <h2 className="font-heading font-black text-2xl">Ambiente da Rua</h2>
-        <p className="text-muted-foreground text-sm mt-1">
-          Escolha o que vai te atrapalhar!
-        </p>
-      </div>
-
-      <div className="space-y-3">
-        {OBSTACLES.map((obs) => (
-          <motion.button
-            key={obs.id}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => { setSelectedObstacle(obs); startRound(0, 0); }}
-            className={`w-full p-4 rounded-2xl border-2 transition-all text-left flex items-center gap-4 ${
-              selectedObstacle.id === obs.id
-                ? 'border-primary bg-primary/10 shadow-md'
-                : 'border-border/30 bg-card hover:border-primary/50'
-            }`}
-          >
-            <div className="text-3xl">{obs.emoji}</div>
-            <div>
-              <p className="font-bold">{obs.name}</p>
-              <p className="text-xs text-muted-foreground">{obs.desc}</p>
-            </div>
-          </motion.button>
-        ))}
-      </div>
-
-      <motion.button whileTap={{ scale: 0.95 }}
-        onClick={() => setPhase('ball-select')}
-        className="w-full py-3 rounded-xl font-bold bg-muted text-muted-foreground">
-        ← Voltar
-      </motion.button>
-    </div>
-  );
-
-  // ─── RESULTADO ───────────────────────────────────────────────────────────────
-  if (phase === 'result') {
-    const passed = score >= 2;
-    return (
-      <div className="space-y-5 text-center">
-        <motion.div className="text-7xl"
-          initial={{ scale: 0 }} animate={{ scale: 1 }}
-          transition={{ type: 'spring', stiffness: 260 }}>
-          {passed ? '🏆' : '💪'}
-        </motion.div>
-        <div>
-          <h2 className="font-heading font-black text-2xl">
-            {passed ? 'Gol de placa!' : 'Continue treinando!'}
-          </h2>
-          <p className="text-muted-foreground mt-1">
-            {score} / {MAX_ATTEMPTS} gols · {passed ? '🌟 Próximo nível desbloqueado!' : ''}
-          </p>
-        </div>
-
-        {/* Mini scoreboard */}
-        <div className="flex justify-center gap-2">
-          {Array.from({length: MAX_ATTEMPTS}, (_, i) => (
-            <div key={i} className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-              i < score ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
-            }`}>
-              {i < score ? '⚽' : '○'}
-            </div>
-          ))}
-        </div>
-
-        <div className="flex gap-2 justify-center flex-wrap">
-          <motion.button whileTap={{ scale: 0.95 }}
-            onClick={() => startRound(0, 0)}
-            className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-3 rounded-2xl font-heading font-bold">
-            <RotateCcw className="w-4 h-4"/> De novo
-          </motion.button>
-          {passed && levelIdx < LEVELS.length - 1 && (
-            <motion.button whileTap={{ scale: 0.95 }}
-              onClick={() => { setLevelIdx(i => i + 1); setPhase('menu'); }}
-              className="bg-yellow-400 text-yellow-900 px-5 py-3 rounded-2xl font-heading font-bold">
-              Próximo →
-            </motion.button>
-          )}
-          <motion.button whileTap={{ scale: 0.95 }}
-            onClick={() => setPhase('menu')}
-            className="bg-muted text-muted-foreground px-4 py-3 rounded-2xl font-bold text-sm">
-            Menu
-          </motion.button>
-        </div>
-      </div>
-    );
-  }
-
-  // ─── JOGO ────────────────────────────────────────────────────────────────────
-  return (
-    <div className="space-y-3 select-none">
-      {/* HUD */}
-      <div className="flex items-center justify-between px-1">
-        <button onClick={() => { setPhase('menu'); }}
-          className="text-sm text-muted-foreground font-semibold">← Sair</button>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-muted-foreground font-bold">{cfg.emoji} {cfg.label}</span>
-          <div className="flex gap-1">
-            {Array.from({length: MAX_ATTEMPTS}, (_, i) => (
-              <div key={i} className={`w-5 h-5 rounded-full text-[10px] flex items-center justify-center font-bold ${
-                i < score ? 'bg-green-500 text-white' : i < attempts ? 'bg-red-400 text-white' : 'bg-muted text-muted-foreground'
-              }`}>
-                {i < score ? '⚽' : i < attempts ? '✕' : '·'}
-              </div>
-            ))}
-          </div>
-          <span className="text-xs text-muted-foreground">{attempts}/{MAX_ATTEMPTS}</span>
-        </div>
-      </div>
-
-      {/* Info */}
-      <div className="mx-1 px-3 py-1.5 rounded-xl bg-muted/30 text-center">
-        <p className="text-xs text-muted-foreground">
-          {selectedBall.emoji} {selectedBall.name} · {selectedObstacle.emoji} {selectedObstacle.name}
-          {' · '}Gol: {goalSide === 'left' ? 'Esquerda' : 'Direita'}
-        </p>
-      </div>
-
-      {/* Campo */}
-      <div
-        className="mx-auto rounded-2xl overflow-hidden shadow-2xl border-2 border-white/10"
-        style={{ maxWidth: 360, touchAction: 'none' }}
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
-      >
-        <StreetField 
-          px={px} py={py} 
-          ball={selectedBall} 
-          obstacles={obstacles}
-          done={done} won={won} 
-          goalSide={goalSide} 
-        />
-      </div>
-
-      {/* Overlay resultado parcial */}
-      <AnimatePresence>
-        {done && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            className={`mx-1 py-2 rounded-2xl text-center font-heading font-black text-lg ${
-              won ? 'bg-green-500/20 text-green-700 dark:text-green-400' : 'bg-red-500/20 text-red-700 dark:text-red-400'
-            }`}
-          >
-            {won ? '⚽ GOL! Chegou no gol!' : `💥 Bateu no ${selectedObstacle.name.toLowerCase()}!`}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-      try { audio.playLose?.(); } catch {}
-      return; // bloqueia movimento em cone
-    }
-
-    const newMoveCount = moveCount + 1;
-    setMoveCount(newMoveCount);
-    setPx(nx); setPy(ny);
-    try { audio.playDribble?.(); } catch {}
-
-    // META atingida
-    if (ny === 0) {
-      const newScore = score + 1;
-      setScore(newScore);
-      setWon(true); setDone(true);
-      try { audio.playGoal?.(); } catch {}
-      const newAtt = attempts + 1;
-      setAttempts(newAtt);
-      if (newAtt >= MAX_ATT) {
-        setTimeout(() => {
-          if (newScore >= 3) setUnlocked(u => Math.max(u, levelIdx + 1));
-          setPhase('result');
-        }, 900);
-      } else {
-        setTimeout(() => startRound(newAtt, newScore), 900);
-      }
+  // ─── Game loop ────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (phase !== 'playing') {
+      if (loopRef.current) cancelAnimationFrame(loopRef.current);
       return;
     }
 
-    // Mover bot
-    if (newMoveCount % cfg.botFreq === 0) {
-      const nb = moveBot(nx, ny, bx, by, cfg.botRandom);
-      setBx(nb.x); setBy(nb.y);
+    const gameLoop = () => {
+      const vx = velocityRef.current.x;
+      const vy = velocityRef.current.y;
+      const speed = 3.5 * selectedBall.speed;
 
-      // Bot alcançou jogadora
-      if (nb.x === nx && nb.y === ny) {
-        setDone(true); setWon(false);
-        try { audio.playLose?.(); } catch {}
-        const newAtt = attempts + 1;
-        setAttempts(newAtt);
-        if (newAtt >= MAX_ATT) {
-          setTimeout(() => setPhase('result'), 800);
+      // Atualizar posição do jogador
+      setPlayerPos(prev => {
+        const newX = Math.max(PLAYER_SIZE, Math.min(FIELD_W - PLAYER_SIZE, prev.x + vx * speed));
+        const newY = Math.max(PLAYER_SIZE, Math.min(FIELD_H - PLAYER_SIZE, prev.y + vy * speed));
+        return { x: newX, y: newY };
+      });
+
+      // Atualizar posição do bot (persegue o jogador)
+      setBotPos(prev => {
+        const dx = playerPos.x - prev.x;
+        const dy = playerPos.y - prev.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const botSpeed = config.botSpeed;
+        return {
+          x: Math.max(PLAYER_SIZE, Math.min(FIELD_W - PLAYER_SIZE, prev.x + (dx / dist) * botSpeed)),
+          y: Math.max(PLAYER_SIZE, Math.min(FIELD_H - PLAYER_SIZE, prev.y + (dy / dist) * botSpeed))
+        };
+      });
+
+      // Atualizar obstáculos com movimento
+      setObstaclePositions(prev => prev.map(obs => {
+        if (obs.type.behavior === 'patrol') {
+          let newX = obs.x + obs.dir * obs.speed;
+          if (newX < 20 || newX > FIELD_W - 20) {
+            return { ...obs, dir: -obs.dir };
+          }
+          return { ...obs, x: newX };
+        }
+        return obs;
+      }));
+
+      // Verificar colisão com o bot
+      const dist = distance(playerPos, botPos);
+      if (dist < PLAYER_SIZE + PLAYER_SIZE) {
+        const newLives = lives - 1;
+        setLives(newLives);
+        if (newLives <= 0) {
+          setGameOver(true);
+          setPhase('result');
         } else {
-          setTimeout(() => startRound(newAtt, score), 800);
+          // Respawn
+          setPlayerPos(playerStart.current);
+          setBotPos({ x: FIELD_W / 2, y: 50 });
+        }
+        return;
+      }
+
+      // Verificar colisão com obstáculos
+      obstaclePositions.forEach(obs => {
+        const d = distance(playerPos, { x: obs.x, y: obs.y });
+        if (d < PLAYER_SIZE + OBSTACLE_SIZE) {
+          // Empurrar jogador
+          const angle = Math.atan2(playerPos.y - obs.y, playerPos.x - obs.x);
+          setPlayerPos(prev => ({
+            x: Math.max(PLAYER_SIZE, Math.min(FIELD_W - PLAYER_SIZE, prev.x + Math.cos(angle) * 3)),
+            y: Math.max(PLAYER_SIZE, Math.min(FIELD_H - PLAYER_SIZE, prev.y + Math.sin(angle) * 3))
+          }));
+        }
+      });
+
+      // Verificar gol (chegou no gol do adversário - topo)
+      const inGoalX = Math.abs(playerPos.x - FIELD_W / 2) < GOAL_WIDTH / 2;
+      const inGoalY = playerPos.y < GOAL_HEIGHT + PLAYER_SIZE;
+      if (inGoalX && inGoalY) {
+        const newGoals = goals + 1;
+        const newScore = score + (level + 1) * 10;
+        setGoals(newGoals);
+        setScore(newScore);
+
+        if (newGoals >= config.goals) {
+          // Avançar de nível
+          if (level < LEVELS.length - 1) {
+            setLevel(l => l + 1);
+            setGoals(0);
+            generateObstacles();
+            setPlayerPos(playerStart.current);
+            setBotPos({ x: FIELD_W / 2, y: 50 });
+          } else {
+            // Vitória!
+            setPhase('result');
+          }
+        } else {
+          // Continuar
+          setPlayerPos(playerStart.current);
+          setBotPos({ x: FIELD_W / 2, y: 50 });
         }
       }
-    }
-  }, [phase, cfg, levelIdx, startRound]);
 
-  // ─── Teclado ────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const h = (e) => {
-      if (e.key === 'ArrowUp')    { e.preventDefault(); move(0, -1); }
-      if (e.key === 'ArrowDown')  { e.preventDefault(); move(0,  1); }
-      if (e.key === 'ArrowLeft')  move(-1, 0);
-      if (e.key === 'ArrowRight') move( 1, 0);
+      loopRef.current = requestAnimationFrame(gameLoop);
     };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [move]);
 
-  // ─── Swipe ──────────────────────────────────────────────────────────────────
-  const touch = useRef(null);
-  const onTouchStart = (e) => { touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; };
-  const onTouchEnd   = (e) => {
-    if (!touch.current) return;
-    const dx = e.changedTouches[0].clientX - touch.current.x;
-    const dy = e.changedTouches[0].clientY - touch.current.y;
-    touch.current = null;
-    if (Math.abs(dy) > Math.abs(dx)) { move(0, dy < 0 ? -1 : 1); return; }
-    if (Math.abs(dx) > 8) move(dx < 0 ? -1 : 1, 0);
+    loopRef.current = requestAnimationFrame(gameLoop);
+    return () => {
+      if (loopRef.current) cancelAnimationFrame(loopRef.current);
+    };
+  }, [phase, playerPos, botPos, obstaclePositions, lives, level, goals, config, selectedBall, score]);
+
+  // ─── Timer ────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (phase !== 'playing') return;
+    const timer = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          setPhase('result');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [phase]);
+
+  // ─--- Controles de teclado ─────────────────────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const speed = 1;
+      const moves = {
+        ArrowUp: { x: 0, y: -speed },
+        ArrowDown: { x: 0, y: speed },
+        ArrowLeft: { x: -speed, y: 0 },
+        ArrowRight: { x: speed, y: 0 },
+        w: { x: 0, y: -speed },
+        s: { x: 0, y: speed },
+        a: { x: -speed, y: 0 },
+        d: { x: speed, y: 0 }
+      };
+      const move = moves[e.key];
+      if (move) {
+        e.preventDefault();
+        velocityRef.current = move;
+        setVelocity(move);
+      }
+    };
+
+    const handleKeyUp = () => {
+      velocityRef.current = { x: 0, y: 0 };
+      setVelocity({ x: 0, y: 0 });
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  // ─--- Controles touch para mobile ─────────────────────────────────────
+  const handleTouchMove = (e) => {
+    if (phase !== 'playing') return;
+    const touch = e.touches[0];
+    const rect = e.currentTarget.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const dx = touch.clientX - centerX;
+    const dy = touch.clientY - centerY;
+    const magnitude = Math.sqrt(dx * dx + dy * dy);
+    if (magnitude > 0) {
+      const normalizedX = dx / magnitude;
+      const normalizedY = dy / magnitude;
+      velocityRef.current = { x: normalizedX, y: normalizedY };
+      setVelocity({ x: normalizedX, y: normalizedY });
+    }
   };
 
-  // ─── MENU ───────────────────────────────────────────────────────────────────
-  if (phase === 'menu') return (
-    <div className="space-y-5">
-      <div className="text-center">
-        <motion.div className="text-5xl mb-2"
-          animate={{ x: [-8, 8, -8] }} transition={{ repeat: Infinity, duration: 0.85 }}>
-          ⚡
-        </motion.div>
-        <h2 className="font-heading font-black text-2xl">Zig Zague</h2>
-        <p className="text-muted-foreground text-sm mt-1">
-          Leve a bola até a meta — sem ser pego pelo tênis!
-        </p>
-      </div>
+  const handleTouchEnd = () => {
+    velocityRef.current = { x: 0, y: 0 };
+    setVelocity({ x: 0, y: 0 });
+  };
 
-      <div className="grid grid-cols-3 gap-2 text-center">
-        {[
-          { icon:'⚽', text:'Mova a bola\naté a META 🏁' },
-          { icon:'🔶', text:'Cones bloqueiam\no caminho' },
-          { icon:'👟', text:'Fuja do tênis\nque te persegue!' },
-        ].map((item, i) => (
-          <div key={i} className="bg-card border border-border/30 rounded-2xl p-3 space-y-1">
-            <div className="text-2xl">{item.icon}</div>
-            <p className="text-xs text-muted-foreground leading-tight whitespace-pre-line">{item.text}</p>
-          </div>
-        ))}
-      </div>
+  // ─── Handlers de seleção ────────────────────────────────────────────────
+  const handleSelectBall = (ball) => {
+    setSelectedBall(ball);
+    setPhase('obstacle-select');
+  };
 
-      {/* Seleção de nível */}
-      <div className="space-y-2">
-        <p className="text-xs font-bold text-muted-foreground uppercase">Nível</p>
-        <div className="grid grid-cols-3 gap-2">
-          {LEVELS.map((lvl, i) => {
-            const ok = i <= unlocked;
-            return (
-              <button key={i} disabled={!ok} onClick={() => setLevelIdx(i)}
-                className={`py-2 px-1 rounded-xl text-xs font-bold border-2 transition-all ${
-                  levelIdx === i
-                    ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                    : ok
-                    ? 'bg-card border-border/30 hover:border-primary/50'
-                    : 'opacity-25 cursor-not-allowed border-border/20'
-                }`}>
-                {ok ? lvl.emoji : '🔒'} {lvl.label}
-              </button>
-            );
-          })}
-        </div>
-        <div className="bg-muted/30 rounded-xl p-3 text-center">
-          <p className="font-bold text-sm">{cfg.emoji} {cfg.label}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{cfg.desc}</p>
-        </div>
-      </div>
+  const handleToggleObstacle = (obs) => {
+    setSelectedObstacles(prev => {
+      if (prev.find(o => o.id === obs.id)) {
+        return prev.filter(o => o.id !== obs.id);
+      }
+      return [...prev, obs];
+    });
+  };
 
-      <motion.button whileTap={{ scale: 0.95 }}
-        onClick={() => startRound(0, 0)}
-        className="w-full py-5 rounded-3xl font-heading font-black text-xl text-white shadow-xl"
-        style={{ background: 'linear-gradient(135deg,#f59e0b,#ef4444)' }}>
-        ▶ Jogar!
-      </motion.button>
-    </div>
-  );
+  // ─── Renderização ─────────────────────────────────────────────────────────────
 
-  // ─── RESULTADO ───────────────────────────────────────────────────────────────
-  if (phase === 'result') {
-    const passed = score >= 3;
+  // Menu principal
+  if (phase === 'menu') {
     return (
-      <div className="space-y-5 text-center">
-        <motion.div className="text-7xl"
-          initial={{ scale: 0 }} animate={{ scale: 1 }}
-          transition={{ type: 'spring', stiffness: 260 }}>
-          {passed ? '🏆' : '💪'}
-        </motion.div>
-        <div>
-          <h2 className="font-heading font-black text-2xl">
-            {passed ? 'Incrível!' : 'Continue treinando!'}
-          </h2>
-          <p className="text-muted-foreground mt-1">
-            {score} / {MAX_ATT} metas · {passed ? '🌟 Próximo nível desbloqueado!' : ''}
+      <div className="flex flex-col items-center justify-center min-h-[80vh] gap-4 px-4">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="text-center"
+        >
+          <div className="text-5xl mb-2">⚽</div>
+          <h1 className="font-heading font-black text-3xl text-primary mb-1">
+            Futebol de Rua
+          </h1>
+          <p className="text-gray-500 text-sm px-8 text-center">
+            Fuja do marcador e marque gols em um 1x1 de rua!
           </p>
+        </motion.div>
+
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setPhase('ball-select')}
+          className="w-full max-w-xs py-3 bg-gradient-to-r from-primary to-green-500 text-white font-bold rounded-xl shadow-lg"
+        >
+          Começar
+        </motion.button>
+      </div>
+    );
+  }
+
+  // Seleção de bola
+  if (phase === 'ball-select') {
+    return (
+      <div className="flex flex-col items-center gap-4 px-4 py-6">
+        <div className="text-center mb-2">
+          <h2 className="font-heading font-bold text-xl text-primary">Escolha sua Bola</h2>
+          <p className="text-gray-500 text-sm">Cada bola tem características diferentes</p>
         </div>
 
-        {/* Mini scoreboard */}
-        <div className="flex justify-center gap-2">
-          {Array.from({length: MAX_ATT}, (_, i) => (
-            <div key={i} className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-              i < score ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
-            }`}>
-              {i < score ? '⚽' : '○'}
-            </div>
+        <div className="grid grid-cols-2 gap-2 w-full max-w-sm">
+          {BALL_TYPES.map(ball => (
+            <motion.button
+              key={ball.id}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => handleSelectBall(ball)}
+              className={`p-3 rounded-xl border-2 flex flex-col items-center gap-1 ${
+                selectedBall.id === ball.id ? 'border-primary bg-primary/10' : 'border-gray-200 bg-white'
+              }`}
+            >
+              <span className="text-2xl">{ball.emoji}</span>
+              <span className="font-bold text-xs">{ball.name}</span>
+              <span className="text-[10px] text-gray-500">{ball.desc}</span>
+            </motion.button>
           ))}
         </div>
 
-        <div className="flex gap-2 justify-center flex-wrap">
-          <motion.button whileTap={{ scale: 0.95 }}
-            onClick={() => startRound(0, 0)}
-            className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-3 rounded-2xl font-heading font-bold">
-            <RotateCcw className="w-4 h-4"/> De novo
-          </motion.button>
-          {passed && levelIdx < LEVELS.length - 1 && (
-            <motion.button whileTap={{ scale: 0.95 }}
-              onClick={() => { setLevelIdx(i => i + 1); setPhase('menu'); }}
-              className="bg-yellow-400 text-yellow-900 px-5 py-3 rounded-2xl font-heading font-bold">
-              Próximo →
+        <button
+          onClick={() => setPhase('obstacle-select')}
+          className="w-full max-w-xs py-2 bg-gray-100 text-gray-700 font-bold rounded-lg"
+        >
+          Próximo
+        </button>
+      </div>
+    );
+  }
+
+  // Seleção de obstáculos
+  if (phase === 'obstacle-select') {
+    return (
+      <div className="flex flex-col items-center gap-4 px-4 py-6">
+        <div className="text-center mb-2">
+          <p className="text-xs text-gray-500">
+            Bola: {selectedBall.emoji} {selectedBall.name}
+          </p>
+          <h2 className="font-heading font-bold text-xl text-primary">Ambiente da Rua</h2>
+          <p className="text-gray-500 text-sm">Adicione elementos da rua (opcional)</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 w-full max-w-sm">
+          {OBSTACLE_TYPES.map(obs => (
+            <motion.button
+              key={obs.id}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => handleToggleObstacle(obs)}
+              className={`p-2 rounded-xl border-2 flex items-center gap-2 ${
+                selectedObstacles.find(o => o.id === obs.id) ? 'border-primary bg-primary/10' : 'border-gray-200 bg-white'
+              }`}
+            >
+              <span className="text-lg">{obs.emoji}</span>
+              <span className="font-bold text-xs">{obs.name}</span>
             </motion.button>
-          )}
-          <motion.button whileTap={{ scale: 0.95 }}
+          ))}
+        </div>
+
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={startGame}
+          className="w-full max-w-xs py-3 bg-gradient-to-r from-primary to-green-500 text-white font-bold rounded-xl shadow-lg"
+        >
+          Jogar! ⚽
+        </motion.button>
+      </div>
+    );
+  }
+
+  // Tela de jogo
+  if (phase === 'playing') {
+    return (
+      <div className="flex flex-col gap-3 p-2">
+        {/* HUD */}
+        <div className="flex justify-between items-center px-2">
+          <div className="flex gap-1">
+            {Array.from({ length: lives }).map((_, i) => (
+              <span key={i} className="text-lg">❤️</span>
+            ))}
+          </div>
+          <div className="text-center">
+            <p className="font-bold text-primary">{config.label}</p>
+            <p className="text-xs text-gray-500">{goals}/{config.goals}</p>
+          </div>
+          <div className="text-right">
+            <p className="font-bold text-lg text-primary">{score}</p>
+            <p className="text-xs text-gray-500">pts</p>
+          </div>
+        </div>
+
+        {/* Campo de futebol de rua */}
+        <div
+          className="relative w-full aspect-[3/4] max-h-[320px] overflow-hidden rounded-xl"
+          style={{
+            background: 'linear-gradient(180deg, #78350f 0%, #92400e 50%, #78350f 100%)',
+            border: '2px solid #92400e'
+          }}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* Linhas da rua */}
+          <div className="absolute inset-0 opacity-30">
+            <div className="absolute left-1/4 top-0 bottom-0 w-px bg-gray-300" />
+            <div className="absolute right-1/4 top-0 bottom-0 w-px bg-gray-300" />
+          </div>
+
+          {/* Gol do jogador (baixo) */}
+          <div
+            className="absolute bottom-0 left-1/2 transform -translate-x-[-50%]"
+            style={{
+              width: GOAL_WIDTH,
+              height: GOAL_HEIGHT,
+              background: 'rgba(34, 197, 94, 0.7)',
+              border: '2px solid rgba(34, 197, 94, 0.8)',
+              borderTopLeftRadius: 4,
+              borderTopRightRadius: 4,
+            }}
+          >
+            <span className="absolute top-1 left-1/2 transform -translate-x-[-50%] text-lg">🥅</span>
+          </div>
+
+          {/* Gol do adversário (topo) */}
+          <div
+            className="absolute top-0 left-1/2 transform -translate-x-[-50%]"
+            style={{
+              width: GOAL_WIDTH,
+              height: GOAL_HEIGHT,
+              background: 'rgba(239, 68, 68, 0.7)',
+              border: '2px solid rgba(239, 68, 68, 0.8)',
+              borderBottomLeftRadius: 4,
+              borderBottomRightRadius: 4,
+            }}
+          >
+            <span className="absolute bottom-1 left-1/2 transform -translate-x-[-50%] text-lg">⚽</span>
+          </div>
+
+          {/* Obstáculos */}
+          {obstaclePositions.map(obs => (
+            <div
+              key={obs.id}
+              className="absolute"
+              style={{
+                left: obs.x,
+                top: obs.y,
+                transform: 'translate(-50%, -50%)',
+                fontSize: 28
+              }}
+            >
+              {obs.type.emoji}
+            </div>
+          ))}
+
+          {/* Jogador */}
+          <div
+            className="absolute"
+            style={{
+              left: playerPos.x,
+              top: playerPos.y,
+              transform: 'translate(-50%, -50%)',
+            }}
+          >
+            <div
+              className="rounded-full"
+              style={{
+                width: PLAYER_SIZE * 2,
+                height: PLAYER_SIZE * 2,
+                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                border: '2px solid white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 20
+              }}
+            >
+              {selectedBall.emoji}
+            </div>
+          </div>
+
+          {/* Marcador/Bot */}
+          <div
+            className="absolute"
+            style={{
+              left: botPos.x,
+              top: botPos.y,
+              transform: 'translate(-50%, -50%)',
+            }}
+          >
+            <div
+              className="rounded-full"
+              style={{
+                width: PLAYER_SIZE * 2,
+                height: PLAYER_SIZE * 2,
+                background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                border: '2px solid white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 20
+              }}
+            >
+              😤
+            </div>
+          </div>
+        </div>
+
+        {/* Controles Mobile */}
+        <div className="grid grid-cols-3 gap-1 w-full max-w-xs mx-auto">
+          <button
+            onTouchStart={() => { velocityRef.current = { x: -1, y: 0 }; setVelocity({ x: -1, y: 0 }); }}
+            onTouchEnd={() => { velocityRef.current = { x: 0, y: 0 }; setVelocity({ x: 0, y: 0 }); }}
+            className="p-2 rounded-lg bg-amber-100 text-xl"
+          >
+            ⬅️
+          </button>
+          <div className="flex flex-col gap-1">
+            <button
+              onTouchStart={() => { velocityRef.current = { x: 0, y: -1 }; setVelocity({ x: 0, y: -1 }); }}
+              onTouchEnd={() => { velocityRef.current = { x: 0, y: 0 }; setVelocity({ x: 0, y: 0 }); }}
+              className="p-2 rounded-lg bg-amber-100 text-xl"
+            >
+              ⬆️
+            </button>
+            <button
+              onTouchStart={() => { velocityRef.current = { x: 0, y: 1 }; setVelocity({ x: 0, y: 1 }); }}
+              onTouchEnd={() => { velocityRef.current = { x: 0, y: 0 }; setVelocity({ x: 0, y: 0 }); }}
+              className="p-2 rounded-lg bg-amber-100 text-xl"
+            >
+              ⬇️
+            </button>
+          </div>
+          <button
+            onTouchStart={() => { velocityRef.current = { x: 1, y: 0 }; setVelocity({ x: 1, y: 0 }); }}
+            onTouchEnd={() => { velocityRef.current = { x: 0, y: 0 }; setVelocity({ x: 0, y: 0 }); }}
+            className="p5 rounded-lg bg-amber-100 text-xl"
+          >
+            ➡️
+          </button>
+        </div>
+
+        <p className="text-xs text-gray-400 text-center">{config.desc}</p>
+      </div>
+    );
+  }
+
+  // Tela de Resultado
+  if (phase === 'result') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[80vh] gap-4 px-4">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="text-center"
+        >
+          <div className="text-5xl mb-2">{gameOver ? '😢' : '🏆'}</div>
+          <h2 className="font-heading font-black text-2xl text-primary mb-1">
+            {gameOver ? 'Fim de Jogo!' : 'Parabéns!'}
+          </h2>
+          <p className="text-gray-500">
+            {gameOver ? 'O marcador te pegou!' : `Nível ${level + 1} completo!`}
+          </p>
+        </motion.div>
+
+        <div className="bg-white rounded-xl p-4 w-full max-w-xs shadow-lg">
+          <div className="text-4xl font-bold text-primary text-center">{score}</div>
+          <div className="text-sm text-gray-500 text-center mb-2">pontos</div>
+          <div className="flex justify-around text-sm">
+            <div className="text-center">
+              <div className="font-bold">{level + 1}</div>
+              <div className="text-xs text-gray-400">Nível</div>
+            </div>
+            <div className="text-center">
+              <div className="font-bold">{goals}</div>
+              <div className="text-xs text-gray-400">Gols</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-2 w-full max-w-xs">
+          <motion.button
+            whileTap={{ scale: 0.95 }}
             onClick={() => setPhase('menu')}
-            className="bg-muted text-muted-foreground px-4 py-3 rounded-2xl font-bold text-sm">
+            className="flex-1 py-2 bg-gray-100 text-gray-700 font-bold rounded-lg"
+          >
             Menu
+          </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={startGame}
+            className="flex-1 py-2 bg-gradient-to-r from-primary to-green-500 text-white font-bold rounded-lg"
+          >
+            Jogar Novamente
           </motion.button>
         </div>
       </div>
     );
   }
-
-  // ─── JOGO ────────────────────────────────────────────────────────────────────
-  return (
-    <div className="space-y-3 select-none">
-      {/* HUD */}
-      <div className="flex items-center justify-between px-1">
-        <button onClick={() => { setPhase('menu'); }}
-          className="text-sm text-muted-foreground font-semibold">← Sair</button>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-muted-foreground font-bold">{cfg.emoji} {cfg.label}</span>
-          <div className="flex gap-1">
-            {Array.from({length: MAX_ATT}, (_, i) => (
-              <div key={i} className={`w-5 h-5 rounded-full text-[10px] flex items-center justify-center font-bold ${
-                i < score ? 'bg-green-500 text-white' : i < attempts ? 'bg-red-400 text-white' : 'bg-muted text-muted-foreground'
-              }`}>
-                {i < score ? '⚽' : i < attempts ? '✕' : '·'}
-              </div>
-            ))}
-          </div>
-          <span className="text-xs text-muted-foreground">{attempts}/{MAX_ATT}</span>
-        </div>
-      </div>
-
-      {/* Info do bot */}
-      <div className="mx-1 px-3 py-1.5 rounded-xl bg-muted/30 text-center">
-        <p className="text-xs text-muted-foreground">
-          {cfg.botHidden ? '👻 Tênis invisível!' : cfg.botRandom ? '🎲 Tênis imprevisível!' : `👟 Tênis a cada ${cfg.botFreq} jogada${cfg.botFreq > 1 ? 's' : ''}`}
-          {' · '}Movimento: <strong>{moveCount}</strong>
-        </p>
-      </div>
-
-      {/* Campo */}
-      <div
-        className="mx-auto rounded-2xl overflow-hidden shadow-2xl border-2 border-white/10"
-        style={{ maxWidth: 340, touchAction: 'none' }}
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
-      >
-        <Field px={px} py={py} bx={bx} by={by} cones={cones}
-          botHidden={cfg.botHidden} done={done} won={won} />
-      </div>
-
-      {/* Overlay resultado parcial */}
-      <AnimatePresence>
-        {done && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            className={`mx-1 py-2 rounded-2xl text-center font-heading font-black text-lg ${
-              won ? 'bg-green-500/20 text-green-700 dark:text-green-400' : 'bg-red-500/20 text-red-700 dark:text-red-400'
-            }`}
-          >
-            {won ? '⚽ GOL! Meta atingida!' : cfg.botHidden ? '👻 O tênis invisível te pegou!' : '👟 O tênis te alcançou!'}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Controles */}
-      {!done && (
-        <div className="flex flex-col items-center gap-1.5 px-2">
-          <motion.button whileTap={{ scale: 0.86, y: -3 }}
-            onPointerDown={() => move(0, -1)}
-            className="w-16 h-12 rounded-2xl font-black text-white text-xl shadow-lg flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg,#15803d,#22c55e)' }}>
-            ↑
-          </motion.button>
-          <div className="flex gap-2">
-            <motion.button whileTap={{ scale: 0.86 }}
-              onPointerDown={() => move(-1, 0)}
-              className="w-16 h-12 rounded-2xl font-black text-white text-xl shadow-lg flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg,#f59e0b,#d97706)' }}>
-              ←
-            </motion.button>
-            <div className="w-16 h-12 rounded-2xl bg-muted/30 flex items-center justify-center text-2xl">⚽</div>
-            <motion.button whileTap={{ scale: 0.86 }}
-              onPointerDown={() => move(1, 0)}
-              className="w-16 h-12 rounded-2xl font-black text-white text-xl shadow-lg flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg,#f59e0b,#d97706)' }}>
-              →
-            </motion.button>
-          </div>
-          <motion.button whileTap={{ scale: 0.86, y: 3 }}
-            onPointerDown={() => move(0, 1)}
-            className="w-16 h-12 rounded-2xl font-black text-white text-xl shadow-lg flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg,#7c3aed,#a855f7)' }}>
-            ↓
-          </motion.button>
-        </div>
-      )}
-
-      <p className="text-center text-xs text-muted-foreground pb-1">
-        Chegue à <strong>🏁 META</strong> · Desvie dos 🔶 · Setas e swipe funcionam
-      </p>
-    </div>
-  );
 }
