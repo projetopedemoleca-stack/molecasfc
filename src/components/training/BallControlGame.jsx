@@ -4,7 +4,6 @@ import { RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { audio } from '@/lib/audioEngine';
 import { bgMusic } from '@/lib/trainingMusic';
 import { LevelBadge } from './TrainingHelpers';
-import { earnGoldenStickerLocal } from '@/lib/goldenStickers';
 
 const W = 300, H = 340;
 const PLAYER_Y = H - 60;
