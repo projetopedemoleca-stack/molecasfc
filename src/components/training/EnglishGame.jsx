@@ -414,7 +414,8 @@ export default function EnglishGame() {
           );
         })}
       </div>
-    </>;
+    </>
+  );
 
   // === LESSON ===
   if (view === 'lesson') {
