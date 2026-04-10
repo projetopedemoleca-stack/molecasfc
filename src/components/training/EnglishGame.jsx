@@ -3,8 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Volume2, Mic } from 'lucide-react';
 import { ProgressBar } from './TrainingHelpers';
 import { bgMusic, speak } from '@/lib/trainingMusic';
-import { drawSticker, addSticker } from '@/lib/albumSystem.js';
-import { useStickerToast } from '@/components/ui/StickerEarnedToast.jsx';
 
 const LEVELS = [
   { id: 1, title: 'Positions', subtitle: 'Posições em campo', flag: '🇺🇸', theme: 'from-blue-500 to-blue-700', intro: 'Learn the names of football positions in English!',

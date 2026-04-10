@@ -4,7 +4,6 @@ import { RotateCcw, Zap } from 'lucide-react';
 import { audio } from '@/lib/audioEngine';
 import { bgMusic } from '@/lib/trainingMusic';
 import { LevelBadge } from './TrainingHelpers';
-import { earnGoldenStickerLocal } from '@/lib/goldenStickers';
 
 const POSITIONS = [
   { x: 20, y: 20 }, { x: 50, y: 12 }, { x: 80, y: 20 },
