@@ -482,7 +482,9 @@ export default function EnglishGame() {
             </button>
           )}
         </div>
-      </div></>;
+      </div>
+    </>
+    );
   }
 
   // === SPELLING MINI-GAME ===
