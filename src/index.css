@@ -1,0 +1,107 @@
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Lexend:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-heading: 'Fredoka', sans-serif;
+    --font-body: 'Lexend', sans-serif;
+
+    --background: 145 40% 96%;
+    --foreground: 150 30% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 150 30% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 150 30% 10%;
+    --primary: 150 60% 40%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 45 90% 55%;
+    --secondary-foreground: 30 50% 15%;
+    --muted: 145 20% 90%;
+    --muted-foreground: 150 10% 40%;
+    --accent: 330 70% 55%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 145 20% 85%;
+    --input: 145 20% 85%;
+    --ring: 150 60% 40%;
+    --chart-1: 150 60% 40%;
+    --chart-2: 45 90% 55%;
+    --chart-3: 330 70% 55%;
+    --chart-4: 200 70% 50%;
+    --chart-5: 270 60% 55%;
+    --radius: 1rem;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 150 20% 8%;
+    --foreground: 145 20% 95%;
+    --card: 150 20% 12%;
+    --card-foreground: 145 20% 95%;
+    --popover: 150 20% 12%;
+    --popover-foreground: 145 20% 95%;
+    --primary: 150 60% 45%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 45 80% 50%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 150 15% 18%;
+    --muted-foreground: 145 10% 60%;
+    --accent: 330 70% 55%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 150 15% 20%;
+    --input: 150 15% 20%;
+    --ring: 150 60% 45%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Lexend', sans-serif;
+    letter-spacing: 0.04em;
+    word-spacing: 0.08em;
+    line-height: 1.7;
+  }
+
+  p, span, li, label, button, input, textarea, select {
+    line-height: 1.7;
+    letter-spacing: 0.04em;
+    word-spacing: 0.08em;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Fredoka', sans-serif;
+    letter-spacing: 0.03em;
+    line-height: 1.3;
+  }
+}
