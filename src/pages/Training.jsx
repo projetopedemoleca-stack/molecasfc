@@ -21,8 +21,6 @@ import HistoriaFutebolGame from '@/components/training/HistoriaFutebolGame';
 import AlbumView from '@/components/training/AlbumView';
 import SaudeGame from '@/components/training/SaudeGame';
 import DiarioMenstrual from '@/components/training/DiarioMenstrual';
-
-const TRAINING_MODULES = [
   { id: 'penalty', label: 'Penalti', emoji: '⚽', desc: 'Chute nos 9 quadrantes - engane a goleira!', color: 'from-primary to-green-500', component: PenaltyGame },
   { id: 'pass', label: 'Passe', emoji: '🎯', desc: 'Reação e timing perfeito', color: 'from-blue-500 to-blue-600', component: PassGame },
   { id: 'dribble', label: 'Zig Zague', emoji: '⚡', desc: 'Zigue-zague pelos cones - bata a adversaria!', color: 'from-yellow-500 to-orange-500', component: DribbleGame },

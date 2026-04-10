@@ -296,21 +296,21 @@ export const NATIONAL_TEAMS = [
   { id: 'nat_argelia', name: 'Seleção Argelina', emoji: '🇩🇿', rarity: 'common', category: 'national', country: 'DZ', description: 'The Fennecs', sources: ['career', 'minigame'] }
 ];
 
-// === 10 FIGURINHAS DE TÉCNICAS FAMOSAS ===
+// === 10 FIGURINHAS DE TÉCNICAS / TREINADORES(AS) ===
 export const SKILLS = [
-  // TÉCNICAS BRASILEIRAS (5)
-  { id: 'skill_elastico', name: 'Elástico', emoji: '🌀', rarity: 'epic', category: 'skills', origin: 'BR', description: 'O drible mais brasileiro de todos', sources: ['minigame', 'career'] },
-  { id: 'skill_chapeu', name: 'Chapéu', emoji: '🎩', rarity: 'rare', category: 'skills', origin: 'BR', description: 'Levantar a bola por cima do adversário', sources: ['minigame', 'match'] },
-  { id: 'skill_janelinha', name: 'Janelinha', emoji: '🪟', rarity: 'rare', category: 'skills', origin: 'BR', description: 'Passar entre as pernas do adversário', sources: ['minigame', 'match'] },
-  { id: 'skill_pedalada', name: 'Pedalada', emoji: '🚲', rarity: 'uncommon', category: 'skills', origin: 'BR', description: 'A famosa bike do futebol', sources: ['minigame', 'match'] },
-  { id: 'skill_nutmeg', name: 'Nutmeg', emoji: '🌰', rarity: 'uncommon', category: 'skills', origin: 'BR', description: 'Tocar a bola entre as pernas', sources: ['minigame', 'match'] },
+  // BRASILEIRAS (6)
+  { id: 'skill_emilia_lima',      name: 'Emília Lima',      emoji: '🧠', rarity: 'legendary', category: 'skills', country: 'BR', position: 'Treinadora', description: 'Primeira treinadora campeã da Série A feminina', sources: ['story', 'career'] },
+  { id: 'skill_bia_vaz',          name: 'Bia Vaz',          emoji: '⚡', rarity: 'epic',      category: 'skills', country: 'BR', position: 'Atacante',   description: 'Atacante técnica e versátil do futebol brasileiro', sources: ['minigame', 'career'] },
+  { id: 'skill_tatiele_silveira', name: 'Tatiele Silveira', emoji: '🥅', rarity: 'rare',      category: 'skills', country: 'BR', position: 'Goleira',    description: 'Uma das maiores goleiras da história do Brasil', sources: ['minigame', 'match'] },
+  { id: 'skill_julia_passero',    name: 'Julia Passero',    emoji: '🎯', rarity: 'rare',      category: 'skills', country: 'BR', position: 'Meio-campo', description: 'Criatividade e precisão no meio-campo', sources: ['minigame', 'english'] },
+  { id: 'skill_arthur_elias',     name: 'Arthur Elias',     emoji: '📋', rarity: 'epic',      category: 'skills', country: 'BR', position: 'Treinador',  description: 'Treinador da Seleção Brasileira feminina', sources: ['career', 'story'] },
+  { id: 'skill_borges',           name: 'Jorge Barcellos',  emoji: '🏅', rarity: 'uncommon',  category: 'skills', country: 'BR', position: 'Treinador',  description: 'Ícone da comissão técnica do futebol feminino', sources: ['career'] },
 
-  // TÉCNICAS GRINGAS (5)
-  { id: 'skill_rabona', name: 'Rabona', emoji: '🦵', rarity: 'rare', category: 'skills', origin: 'AR', description: 'Chutar com a perna cruzada', sources: ['minigame', 'career'] },
-  { id: 'skill_scissors', name: 'Scissors', emoji: '✂️', rarity: 'rare', category: 'skills', origin: 'IT', description: 'O corte rápido italiano', sources: ['minigame', 'career'] },
-  { id: 'skill_stepover', name: 'Step Over', emoji: '👣', rarity: 'uncommon', category: 'skills', origin: 'NL', description: 'Passo por cima da bola', sources: ['minigame', 'match'] },
-  { id: 'skill_cruyff_turn', name: 'Cruyff Turn', emoji: '🇳🇱', rarity: 'epic', category: 'skills', origin: 'NL', description: 'O giro lendário de Cruyff', sources: ['minigame', 'career'] },
-  { id: 'skill_maradona', name: 'Giro Maradona', emoji: '🇦🇷', rarity: 'legendary', category: 'skills', origin: 'AR', description: 'O giro mágico de Maradona', sources: ['minigame', 'career'] }
+  // INTERNACIONAIS (4)
+  { id: 'skill_pia_sundhage',     name: 'Pia Sundhage',     emoji: '👑', rarity: 'mythic',    category: 'skills', country: 'SE', position: 'Treinadora', description: 'Lendária treinadora sueca que comandou o Brasil', sources: ['story', 'career'] },
+  { id: 'skill_jill_ellis',       name: 'Jill Ellis',       emoji: '🏆', rarity: 'legendary', category: 'skills', country: 'US', position: 'Treinadora', description: 'Bicampeã mundial com os EUA', sources: ['career', 'story'] },
+  { id: 'skill_sarina_wiegman',   name: 'Sarina Wiegman',   emoji: '🌟', rarity: 'epic',      category: 'skills', country: 'NL', position: 'Treinadora', description: 'Campeã mundial com Holanda e Inglaterra', sources: ['career'] },
+  { id: 'skill_vlatko_andonovski',name: 'Bev Yanez',        emoji: '🎖️', rarity: 'rare',      category: 'skills', country: 'US', position: 'Treinadora', description: 'Referência técnica no futebol feminino mundial', sources: ['minigame', 'career'] },
 ];
 
 // Coleção completa
