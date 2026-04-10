@@ -1,56 +1,94 @@
-import { useCallback } from 'react';
-import { useStickerAlbum } from './useStickerAlbum.js';
+import { useState, useEffect, useCallback } from 'react';
+import {
+  loadAlbum,
+  saveAlbum,
+  addSticker,
+  pasteSticker as pasteStickerLib,
+  generateTradeCode,
+  redeemTradeCode,
+  redeemPromoCode,
+  drawSticker,
+  calculateProgress,
+  markAllAsSeen,
+  getTradableStickers,
+} from '@/lib/albumSystem.js';
+import { ALL_STICKERS, RARITY } from '@/lib/stickersData.js';
 
-export function useStickerRewards() {
-  const { earnSticker } = useStickerAlbum();
+export function useStickerAlbum() {
+  const [album, setAlbum] = useState(() => loadAlbum());
+  const [lastReward, setLastReward] = useState(null);
+  const [showRewardAnimation, setShowRewardAnimation] = useState(false);
 
-  const checkMinigameRewards = useCallback((minigameId, score) => {
-    let preferredRarity;
-    if (score >= 200) preferredRarity = 'legendary';
-    else if (score >= 150) preferredRarity = 'epic';
-    else if (score >= 100) preferredRarity = 'rare';
-    return earnSticker(`minigame_${minigameId}`, preferredRarity);
-  }, [earnSticker]);
+  const refresh = useCallback(() => {
+    setAlbum(loadAlbum());
+  }, []);
 
-  const checkLessonRewards = useCallback((lessonId, accuracy) => {
-    let preferredRarity;
-    if (accuracy >= 95) preferredRarity = 'epic';
-    else if (accuracy >= 80) preferredRarity = 'rare';
-    return earnSticker(`lesson_${lessonId}`, preferredRarity);
-  }, [earnSticker]);
+  const earnSticker = useCallback((source = 'unknown', preferredRarity = null) => {
+    const stickerDef = drawSticker(source, preferredRarity);
+    const result = addSticker(stickerDef.id, source, true);
+    if (result) {
+      refresh();
+      setLastReward({ sticker: result, definition: stickerDef });
+      setShowRewardAnimation(true);
+      return result;
+    }
+    return null;
+  }, [refresh]);
 
-  const checkCareerRewards = useCallback((level) => {
-    let preferredRarity;
-    if (level >= 25) preferredRarity = 'legendary';
-    else if (level >= 15) preferredRarity = 'epic';
-    else if (level >= 8) preferredRarity = 'rare';
-    return earnSticker(`career_level_${level}`, preferredRarity);
-  }, [earnSticker]);
+  const pasteSticker = useCallback((uniqueId) => {
+    const result = pasteStickerLib(uniqueId);
+    if (result.success) refresh();
+    return result;
+  }, [refresh]);
 
-  const checkStoryRewards = useCallback((chapter) => {
-    let preferredRarity;
-    if (chapter >= 10) preferredRarity = 'legendary';
-    else if (chapter >= 7) preferredRarity = 'epic';
-    else if (chapter >= 4) preferredRarity = 'rare';
-    return earnSticker(`story_chapter_${chapter}`, preferredRarity);
-  }, [earnSticker]);
+  const useCode = useCallback((code) => {
+    let result = redeemTradeCode(code);
+    if (!result.success) result = redeemPromoCode(code);
+    if (result.success) {
+      refresh();
+      const sticker = result.sticker || result.stickers?.[0];
+      if (sticker) {
+        setLastReward({ sticker });
+        setShowRewardAnimation(true);
+      }
+    }
+    return result;
+  }, [refresh]);
 
-  const claimDailyReward = useCallback(() => {
-    const dayOfWeek = new Date().getDay();
-    return earnSticker('daily_reward', dayOfWeek === 0 ? 'epic' : undefined);
-  }, [earnSticker]);
+  const generateTrade = useCallback((uniqueId) => {
+    const result = generateTradeCode(uniqueId);
+    if (result.success) refresh();
+    return result;
+  }, [refresh]);
 
-  const claimAchievementReward = useCallback((achievementId, tier) => {
-    const rarityMap = { bronze: 'common', silver: 'rare', gold: 'epic', platinum: 'legendary' };
-    return earnSticker(`achievement_${achievementId}`, rarityMap[tier]);
-  }, [earnSticker]);
+  const markAllStickersAsSeen = useCallback(() => {
+    markAllAsSeen();
+    refresh();
+  }, [refresh]);
+
+  const closeRewardAnimation = useCallback(() => {
+    setShowRewardAnimation(false);
+  }, []);
+
+  const progress = calculateProgress();
+  const newStickersCount = Object.values(album.stickers).filter(s => s.isNew).length;
+  const tradableStickers = getTradableStickers();
 
   return {
-    checkMinigameRewards,
-    checkLessonRewards,
-    checkCareerRewards,
-    checkStoryRewards,
-    claimDailyReward,
-    claimAchievementReward,
+    album,
+    userStickers: Object.values(album.stickers),
+    progress,
+    lastReward,
+    showRewardAnimation,
+    newStickersCount,
+    tradableStickers,
+    earnSticker,
+    pasteSticker,
+    useCode,
+    generateTrade,
+    markAllStickersAsSeen,
+    closeRewardAnimation,
+    allStickers: ALL_STICKERS,
+    rarityConfig: RARITY,
   };
 }
