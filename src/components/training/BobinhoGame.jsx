@@ -4,14 +4,13 @@ import { RotateCcw } from 'lucide-react';
 
 // ── Configuração de níveis ────────────────────────────────────────────────────
 const LEVELS = [
-  { label: 'Nível 1', defSpeed: 1.8, passWindow: 2200, mates: 2, desc: 'Marcador lento — passe com calma!' },
-  { label: 'Nível 2', defSpeed: 2.4, passWindow: 1900, mates: 2, desc: 'Um pouco mais rápido...' },
-  { label: 'Nível 3', defSpeed: 3.0, passWindow: 1600, mates: 3, desc: '3 companheiras! Escolha bem.' },
-  { label: 'Nível 4', defSpeed: 3.7, passWindow: 1400, mates: 3, desc: 'Marcadora rápida — reaja rápido!' },
-  { label: 'Nível 5', defSpeed: 4.4, passWindow: 1100, mates: 4, desc: 'Bobinho raiz — pressão máxima!' },
+  { label: 'Nível 1', defSpeed: 0.12, passWindow: 2200, mates: 2, desc: 'Marcador lento — passe com calma!' },
+  { label: 'Nível 2', defSpeed: 0.17, passWindow: 1900, mates: 2, desc: 'Um pouco mais rápido...' },
+  { label: 'Nível 3', defSpeed: 0.22, passWindow: 1600, mates: 3, desc: '3 companheiras! Escolha bem.' },
+  { label: 'Nível 4', defSpeed: 0.28, passWindow: 1400, mates: 3, desc: 'Marcadora rápida — reaja rápido!' },
+  { label: 'Nível 5', defSpeed: 0.36, passWindow: 1100, mates: 4, desc: 'Bobinho raiz — pressão máxima!' },
 ];
 
-// Posições fixas das companheiras no campo (% do container)
 const MATE_POSITIONS = [
   { x: 15, y: 20 },
   { x: 75, y: 15 },
@@ -19,199 +18,259 @@ const MATE_POSITIONS = [
   { x: 80, y: 70 },
 ];
 
-// Posição inicial do jogador com bola
-const PLAYER_START = { x: 45, y: 50 };
-
-// Posição inicial do marcador
-const DEF_START = { x: 50, y: 20 };
+const PLAYER_POS  = { x: 45, y: 50 };
+const DEF_START   = { x: 50, y: 10 };
+const CATCH_DIST  = 7;   // % de distância para ser pego
+const PASS_GOAL   = 8;   // passes por nível
 
 function dist(a, b) {
   return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
 }
 
-// Anima o marcador em direção ao portador da bola
 function stepToward(from, to, speed) {
   const d = dist(from, to);
-  if (d < speed) return { ...to };
-  const ratio = speed / d;
-  return { x: from.x + (to.x - from.x) * ratio, y: from.y + (to.y - from.y) * ratio };
+  if (d <= speed) return { x: to.x, y: to.y };
+  return {
+    x: from.x + ((to.x - from.x) / d) * speed,
+    y: from.y + ((to.y - from.y) / d) * speed,
+  };
 }
 
+// ── Componente ────────────────────────────────────────────────────────────────
 export default function BobinhoGame({ onStickerEarned }) {
-  const [phase, setPhase]       = useState('menu'); // menu | playing | passed | caught | levelup | win
-  const [level, setLevel]       = useState(0);
-  const [score, setScore]       = useState(0);
-  const [passes, setPasses]     = useState(0);     // passes bem-sucedidos no nível
-  const [lives, setLives]       = useState(3);
-  const [ballOwner, setBallOwner] = useState('player'); // 'player' | índice da mate
-  const [playerPos, setPlayerPos] = useState(PLAYER_START);
-  const [defPos, setDefPos]     = useState(DEF_START);
+  // ── UI state (só para re-render) ─────────────────────────────────────────────
+  const [phase, setPhase]           = useState('menu');
+  const [score, setScore]           = useState(0);
+  const [passes, setPasses]         = useState(0);
+  const [lives, setLives]           = useState(3);
+  const [level, setLevel]           = useState(0);
+  const [defXY, setDefXY]           = useState(DEF_START);
+  const [dangerLevel, setDangerLevel] = useState(0);
+  const [ballOwner, setBallOwner]   = useState('player'); // 'player' | índice mate
+  const [passAnim, setPassAnim]     = useState(null);
+  const [receiverIdx, setReceiverIdx] = useState(null);
   const [matePositions, setMatePositions] = useState([]);
-  const [passAnim, setPassAnim] = useState(null); // { from, to } para a animação da bola viajando
-  const [dangerLevel, setDangerLevel] = useState(0); // 0-1 quão perto o marcador está
-  const [hint, setHint]         = useState('');
-  const [flash, setFlash]       = useState(null); // 'caught' | 'pass'
-  const [receiverIdx, setReceiverIdx] = useState(null); // índice da mate que vai receber
+  const [flash, setFlash]           = useState(null);
+  const [levelupMsg, setLevelupMsg] = useState(false);
 
+  // ── Game state em refs (sem stale closure) ───────────────────────────────────
+  const g = useRef({
+    phase: 'menu',
+    level: 0,
+    score: 0,
+    passes: 0,
+    lives: 3,
+    defX: DEF_START.x,
+    defY: DEF_START.y,
+    ballOwner: 'player',   // 'player' | índice numérico da mate
+    mates: [],             // [{x,y}]
+    passing: false,        // bloqueio durante animação de passe
+    returnTimer: null,
+    flashTimer: null,
+    lastTime: 0,
+  });
   const rafRef    = useRef(null);
-  const stateRef  = useRef({});
-  const passTimerRef = useRef(null); // depois de receber, mate fica com a bola por um tempo
+  const phaseRef  = useRef('menu');
 
-  const cfg = LEVELS[level] || LEVELS[0];
-  const PASS_GOAL = 8; // passes por nível para avançar
-  const CATCH_DIST = 8; // % de distância para ser pego
+  // ── Inicia ou reinicia um nível ───────────────────────────────────────────────
+  const initLevel = useCallback((lvl, currentLives, currentScore, currentPasses) => {
+    const cfg = LEVELS[lvl] || LEVELS[0];
+    const mates = MATE_POSITIONS.slice(0, cfg.mates);
 
-  // ── Inicializar nível ─────────────────────────────────────────────────────────
-  const initLevel = useCallback((lvl) => {
-    const c = LEVELS[lvl] || LEVELS[0];
-    const mates = MATE_POSITIONS.slice(0, c.mates).map((p, i) => ({ ...p, id: i }));
+    // Zera ref de jogo
+    g.current = {
+      ...g.current,
+      phase: 'playing',
+      level: lvl,
+      defX: DEF_START.x,
+      defY: DEF_START.y,
+      ballOwner: 'player',
+      mates,
+      passing: false,
+      lives: currentLives ?? 3,
+      score: currentScore ?? 0,
+      passes: currentPasses ?? 0,
+    };
+
+    // Sincroniza UI state
     setLevel(lvl);
-    setPlayerPos(PLAYER_START);
-    setDefPos(DEF_START);
+    setLives(g.current.lives);
+    setScore(g.current.score);
+    setPasses(g.current.passes);
+    setDefXY(DEF_START);
     setMatePositions(mates);
     setBallOwner('player');
     setPassAnim(null);
     setReceiverIdx(null);
     setDangerLevel(0);
-    setHint('Toque numa companheira para passar!');
+    setFlash(null);
+    phaseRef.current = 'playing';
     setPhase('playing');
   }, []);
 
-  // ── Loop do marcador ─────────────────────────────────────────────────────────
+  // ── RAF loop principal ────────────────────────────────────────────────────────
   useEffect(() => {
-    if (phase !== 'playing') { cancelAnimationFrame(rafRef.current); return; }
-
-    let last = performance.now();
-
     const loop = (now) => {
-      const dt = (now - last) / 16; // ~1 a 60fps normalizado
-      last = now;
+      rafRef.current = requestAnimationFrame(loop);
 
-      // Quem tem a bola?
-      const owner = stateRef.current.ballOwner;
-      const mates = stateRef.current.matePositions || [];
-      let target;
-      if (owner === 'player') {
-        target = stateRef.current.playerPos;
+      if (phaseRef.current !== 'playing') return;
+
+      const dt = g.current.lastTime ? Math.min((now - g.current.lastTime) / 16, 3) : 1;
+      g.current.lastTime = now;
+
+      if (g.current.passing) return; // pausa movimento durante animação de passe
+
+      const cfg = LEVELS[g.current.level] || LEVELS[0];
+
+      // Alvo: quem tem a bola
+      let tx, ty;
+      if (g.current.ballOwner === 'player') {
+        tx = PLAYER_POS.x;
+        ty = PLAYER_POS.y;
       } else {
-        target = mates[owner] || PLAYER_START;
+        const m = g.current.mates[g.current.ballOwner];
+        if (!m) { tx = PLAYER_POS.x; ty = PLAYER_POS.y; }
+        else { tx = m.x; ty = m.y; }
       }
 
-      setDefPos(prev => {
-        const c = LEVELS[stateRef.current.level] || LEVELS[0];
-        const next = stepToward(prev, target, c.defSpeed * dt * 0.055);
-        const d = dist(next, target);
-        setDangerLevel(Math.max(0, 1 - d / 45));
+      // Move marcador em direção ao alvo
+      const from = { x: g.current.defX, y: g.current.defY };
+      const to   = { x: tx, y: ty };
+      const next = stepToward(from, to, cfg.defSpeed * dt);
+      g.current.defX = next.x;
+      g.current.defY = next.y;
 
-        // Pegou!
-        if (d < CATCH_DIST) {
-          cancelAnimationFrame(rafRef.current);
-          setFlash('caught');
-          setTimeout(() => setFlash(null), 700);
-          const newLives = stateRef.current.lives - 1;
-          setLives(newLives);
-          if (newLives <= 0) {
-            setPhase('gameover');
-          } else {
-            // Recomeça o nível
-            initLevel(stateRef.current.level);
-          }
+      // Atualiza UI do marcador
+      setDefXY({ x: next.x, y: next.y });
+
+      // Perigo
+      const d = dist(next, { x: tx, y: ty });
+      const danger = Math.max(0, Math.min(1, 1 - d / 45));
+      setDangerLevel(danger);
+
+      // Pegou?
+      if (d < CATCH_DIST) {
+        g.current.passing = true; // trava loop
+        phaseRef.current = 'catching';
+
+        setFlash('caught');
+        setTimeout(() => setFlash(null), 700);
+
+        const newLives = g.current.lives - 1;
+        g.current.lives = newLives;
+        setLives(newLives);
+
+        if (newLives <= 0) {
+          phaseRef.current = 'gameover';
+          setPhase('gameover');
+        } else {
+          // Recomeça o nível após delay
+          setTimeout(() => {
+            initLevel(g.current.level, newLives, g.current.score, g.current.passes);
+          }, 900);
         }
-        return next;
-      });
-
-      rafRef.current = requestAnimationFrame(loop);
+      }
     };
 
     rafRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [phase, initLevel]);
+  }, [initLevel]); // RAF roda para sempre — phase controlada por phaseRef
 
-  // Sincroniza stateRef
-  useEffect(() => {
-    stateRef.current = { ballOwner, playerPos, defPos, matePositions, level, lives };
-  }, [ballOwner, playerPos, defPos, matePositions, level, lives]);
-
-  // ── Passe para uma companheira ────────────────────────────────────────────────
+  // ── Passe para companheira ────────────────────────────────────────────────────
   const passTo = useCallback((idx) => {
-    if (phase !== 'playing') return;
-    if (ballOwner !== 'player') return; // só pode passar quando tem a bola
+    if (phaseRef.current !== 'playing') return;
+    if (g.current.ballOwner !== 'player') return;
+    if (g.current.passing) return;
 
-    const mate = matePositions[idx];
+    const mate = g.current.mates[idx];
     if (!mate) return;
 
-    cancelAnimationFrame(rafRef.current);
+    // Bloqueia novos passes durante a animação
+    g.current.passing = true;
 
-    // Anima o passe
-    setPassAnim({ from: { ...playerPos }, to: { ...mate } });
+    // Atualiza posse → companheira (ref imediata)
+    g.current.ballOwner = idx;
+    setBallOwner(idx);
     setReceiverIdx(idx);
+
+    // Anima bola voando
+    setPassAnim({ from: { ...PLAYER_POS }, to: { ...mate } });
 
     setTimeout(() => {
       setPassAnim(null);
-      setBallOwner(idx);
       setFlash('pass');
-      setTimeout(() => setFlash(null), 500);
+      setTimeout(() => setFlash(null), 400);
 
-      const newPasses = stateRef.current.passes + 1;
+      // Atualiza pontuação
+      const newPasses = g.current.passes + 1;
+      const newScore  = g.current.score + (g.current.level + 1) * 5;
+      g.current.passes = newPasses;
+      g.current.score  = newScore;
       setPasses(newPasses);
-      const newScore = stateRef.current.score + (level + 1) * 5;
       setScore(newScore);
 
-      // Depois de um tempo, a companheira devolve a bola para o jogador
-      const c = LEVELS[stateRef.current.level] || LEVELS[0];
-      passTimerRef.current = setTimeout(() => {
-        // Devolve: anima bola voltando
-        setPassAnim({ from: { ...mate }, to: { ...PLAYER_START } });
+      // Desbloqueia o loop enquanto companheira tem a bola
+      g.current.passing = false;
+
+      const cfg = LEVELS[g.current.level] || LEVELS[0];
+
+      // Após passWindow, companheira devolve
+      g.current.returnTimer = setTimeout(() => {
+        if (phaseRef.current !== 'playing') return;
+
+        // Bloqueia brevemente para animar retorno
+        g.current.passing = true;
+        g.current.ballOwner = 'player';
+        setBallOwner('player');
+        setReceiverIdx(null);
+        setPassAnim({ from: { ...mate }, to: { ...PLAYER_POS } });
+
         setTimeout(() => {
           setPassAnim(null);
-          setBallOwner('player');
-          setReceiverIdx(null);
+          g.current.passing = false;
 
-          // Verifica se completou o nível
-          if (newPasses >= PASS_GOAL) {
-            const nextLvl = stateRef.current.level + 1;
+          // Verifica avanço de nível
+          if (g.current.passes >= PASS_GOAL) {
+            const nextLvl = g.current.level + 1;
             if (nextLvl >= LEVELS.length) {
+              phaseRef.current = 'win';
               setPhase('win');
             } else {
-              setPhase('levelup');
-              setTimeout(() => initLevel(nextLvl), 1800);
+              setLevelupMsg(true);
+              setTimeout(() => {
+                setLevelupMsg(false);
+                initLevel(nextLvl, g.current.lives, g.current.score, 0);
+              }, 1600);
             }
           }
-          // Reinicia o loop
-        }, 400);
-      }, c.passWindow);
-    }, 350);
-  }, [phase, ballOwner, playerPos, matePositions, level, initLevel]);
+        }, 380);
+      }, cfg.passWindow);
+    }, 340);
+  }, [initLevel]);
 
-  // Sincroniza passes e score no ref
-  useEffect(() => { stateRef.current.passes = passes; }, [passes]);
-  useEffect(() => { stateRef.current.score = score; }, [score]);
-
-  // ── Danger color ──────────────────────────────────────────────────────────────
-  const dangerColor = `rgba(239,68,68,${(dangerLevel * 0.35).toFixed(2)})`;
+  const cfg = LEVELS[level] || LEVELS[0];
+  const dangerColor = `rgba(239,68,68,${(dangerLevel * 0.38).toFixed(2)})`;
 
   // ── MENU ─────────────────────────────────────────────────────────────────────
   if (phase === 'menu') return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] gap-6 px-4">
-      {/* Animação preview */}
-      <div style={{ position: 'relative', width: 220, height: 160,
-        borderRadius: 16, overflow: 'hidden',
+      <div style={{
+        position: 'relative', width: 220, height: 160, borderRadius: 16,
+        overflow: 'hidden',
         background: 'linear-gradient(160deg,#14532d,#166534,#15803d)',
-        boxShadow: '0 8px 32px rgba(21,128,61,0.4)' }}>
-        {/* Grade */}
+        boxShadow: '0 8px 32px rgba(21,128,61,0.4)',
+      }}>
         <svg style={{ position: 'absolute', inset: 0 }} width="220" height="160">
           <circle cx="110" cy="80" r="35" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="1.5"/>
           <line x1="0" y1="80" x2="220" y2="80" stroke="rgba(255,255,255,0.1)" strokeWidth="1"/>
-          <line x1="110" y1="0" x2="110" y2="160" stroke="rgba(255,255,255,0.1)" strokeWidth="1"/>
         </svg>
-        {/* Bonequinhos decorativos */}
-        <motion.div animate={{ x: [0, 30, 0] }} transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
-          style={{ position: 'absolute', left: 80, top: 60, fontSize: 28 }}>⚽</motion.div>
-        <div style={{ position: 'absolute', left: 30, top: 30, fontSize: 24 }}>👧</div>
-        <div style={{ position: 'absolute', right: 30, top: 25, fontSize: 24 }}>👧</div>
-        <motion.div animate={{ x: [0, 18, 36, 18, 0], y: [0, 10, 0, -10, 0] }}
-          transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
-          style={{ position: 'absolute', left: 85, top: 35, fontSize: 20 }}>😤</motion.div>
+        <div style={{ position: 'absolute', left: 30,  top: 30,  fontSize: 28 }}>👧</div>
+        <div style={{ position: 'absolute', right: 30, top: 25,  fontSize: 28 }}>👧</div>
+        <motion.div style={{ position: 'absolute', left: 88, top: 64, fontSize: 26 }}
+          animate={{ x: [0, 28, 0] }} transition={{ duration: 2.2, repeat: Infinity }}>⚽</motion.div>
+        <motion.div style={{ position: 'absolute', left: 84, top: 32, fontSize: 22 }}
+          animate={{ x: [0, 14, 28, 14, 0], y: [0, 8, 0, -8, 0] }}
+          transition={{ duration: 2.8, repeat: Infinity, ease: 'linear' }}>😤</motion.div>
       </div>
 
       <div className="text-center">
@@ -225,12 +284,12 @@ export default function BobinhoGame({ onStickerEarned }) {
           <div className="flex gap-2"><span>👧</span><span>Toque numa companheira para passar a bola</span></div>
           <div className="flex gap-2"><span>😤</span><span>O marcador persegue quem está com a bola</span></div>
           <div className="flex gap-2"><span>⚽</span><span>A companheira devolve depois de um tempo</span></div>
-          <div className="flex gap-2"><span>🏆</span><span>8 passes por nível para avançar — 5 níveis!</span></div>
+          <div className="flex gap-2"><span>🏆</span><span>{PASS_GOAL} passes por nível — 5 níveis no total!</span></div>
         </div>
       </div>
 
       <motion.button whileTap={{ scale: 0.95 }} whileHover={{ scale: 1.03 }}
-        onClick={() => { setPasses(0); setScore(0); setLives(3); initLevel(0); }}
+        onClick={() => { g.current.passes = 0; initLevel(0, 3, 0, 0); }}
         className="w-full max-w-xs py-4 bg-gradient-to-r from-primary to-green-500 text-white font-heading font-black text-xl rounded-2xl shadow-lg"
       >
         Jogar Bobinho ⚽
@@ -255,13 +314,13 @@ export default function BobinhoGame({ onStickerEarned }) {
       </div>
       <div className="flex gap-3 w-full max-w-xs">
         <motion.button whileTap={{ scale: 0.95 }}
-          onClick={() => { setPasses(0); setScore(0); setLives(3); initLevel(0); }}
+          onClick={() => { initLevel(0, 3, 0, 0); }}
           className="flex-1 py-3 bg-gradient-to-r from-primary to-green-500 text-white font-heading font-bold rounded-xl shadow"
         >
           Jogar de Novo
         </motion.button>
         <motion.button whileTap={{ scale: 0.95 }}
-          onClick={() => { setPasses(0); setScore(0); setLives(3); setPhase('menu'); }}
+          onClick={() => { phaseRef.current = 'menu'; setPhase('menu'); }}
           className="py-3 px-4 bg-gray-100 text-gray-600 font-bold rounded-xl"
         >
           Menu
@@ -276,8 +335,7 @@ export default function BobinhoGame({ onStickerEarned }) {
       className="flex flex-col items-center justify-center min-h-[80vh] gap-6 px-4 text-center"
     >
       <motion.div animate={{ rotate: [0, -15, 15, 0], scale: [1, 1.2, 1] }}
-        transition={{ duration: 0.6, repeat: 2 }} className="text-6xl"
-      >🏆</motion.div>
+        transition={{ duration: 0.6, repeat: 2 }} className="text-6xl">🏆</motion.div>
       <div>
         <h1 className="font-heading font-black text-3xl text-primary mb-1">Rainha do Bobinho!</h1>
         <p className="text-gray-500">Você completou todos os níveis!</p>
@@ -288,7 +346,7 @@ export default function BobinhoGame({ onStickerEarned }) {
         <div className="text-gray-400 text-xs mt-2">{passes} passes no total</div>
       </div>
       <motion.button whileTap={{ scale: 0.95 }}
-        onClick={() => { setPasses(0); setScore(0); setLives(3); initLevel(0); }}
+        onClick={() => { initLevel(0, 3, 0, 0); }}
         className="w-full max-w-xs py-4 bg-gradient-to-r from-primary to-green-500 text-white font-heading font-black text-xl rounded-2xl shadow-lg"
       >
         Jogar de Novo
@@ -296,7 +354,7 @@ export default function BobinhoGame({ onStickerEarned }) {
     </motion.div>
   );
 
-  // ── PLAYING / LEVELUP ─────────────────────────────────────────────────────────
+  // ── CAMPO (playing) ───────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col items-center gap-3 pt-2 pb-6 select-none">
 
@@ -304,9 +362,7 @@ export default function BobinhoGame({ onStickerEarned }) {
       <div className="flex items-center justify-between w-full max-w-sm px-1">
         <div className="flex gap-1">
           {[0,1,2].map(i => (
-            <motion.span key={i} animate={i >= lives ? { scale: [1,0.5], opacity: [1,0.2] } : {}}
-              className="text-xl"
-            >{i < lives ? '❤️' : '🖤'}</motion.span>
+            <span key={i} className="text-xl">{i < lives ? '❤️' : '🖤'}</span>
           ))}
         </div>
         <div className="text-center">
@@ -319,110 +375,96 @@ export default function BobinhoGame({ onStickerEarned }) {
         </div>
       </div>
 
-      {/* Barra de progresso de passes */}
+      {/* Barra de progresso */}
       <div className="w-full max-w-sm h-2 bg-gray-100 rounded-full overflow-hidden">
         <motion.div
           className="h-full bg-gradient-to-r from-primary to-green-400 rounded-full"
-          animate={{ width: `${(passes / PASS_GOAL) * 100}%` }}
+          animate={{ width: `${Math.min((passes / PASS_GOAL) * 100, 100)}%` }}
           transition={{ type: 'spring', stiffness: 120 }}
         />
       </div>
 
       {/* Campo */}
-      <div
-        style={{
-          position: 'relative',
-          width: '100%', maxWidth: 360,
-          aspectRatio: '1 / 1.1',
-          borderRadius: 20, overflow: 'hidden',
-          background: 'linear-gradient(160deg,#14532d 0%,#166534 50%,#15803d 100%)',
-          boxShadow: '0 8px 32px rgba(21,128,61,0.35)',
-          border: '2px solid rgba(255,255,255,0.15)',
-        }}
-      >
+      <div style={{
+        position: 'relative', width: '100%', maxWidth: 360,
+        aspectRatio: '1 / 1.05', borderRadius: 20, overflow: 'hidden',
+        background: 'linear-gradient(160deg,#14532d 0%,#166534 50%,#15803d 100%)',
+        boxShadow: '0 8px 32px rgba(21,128,61,0.35)',
+        border: '2px solid rgba(255,255,255,0.15)',
+      }}>
         {/* Flash de perigo/passe */}
         <AnimatePresence>
           {flash === 'caught' && (
-            <motion.div key="caught"
-              initial={{ opacity: 0.85 }} animate={{ opacity: 0 }}
+            <motion.div key="caught" initial={{ opacity: 0.85 }} animate={{ opacity: 0 }}
               transition={{ duration: 0.6 }}
               style={{ position: 'absolute', inset: 0, background: '#ef4444', zIndex: 50, pointerEvents: 'none' }}
             />
           )}
           {flash === 'pass' && (
-            <motion.div key="pass"
-              initial={{ opacity: 0.7 }} animate={{ opacity: 0 }}
+            <motion.div key="pass" initial={{ opacity: 0.65 }} animate={{ opacity: 0 }}
               transition={{ duration: 0.4 }}
               style={{ position: 'absolute', inset: 0, background: '#22c55e', zIndex: 50, pointerEvents: 'none' }}
             />
           )}
         </AnimatePresence>
 
-        {/* Overlay de perigo gradual */}
+        {/* Overlay de perigo */}
         <div style={{
           position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 5,
-          background: dangerColor,
-          transition: 'background 0.2s',
+          background: dangerColor, transition: 'background 0.15s',
         }} />
 
-        {/* Linhas do campo SVG */}
+        {/* Linhas do campo */}
         <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
-          <ellipse cx="50%" cy="50%" rx="28%" ry="28%" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="1.5"/>
-          <line x1="0" y1="50%" x2="100%" y2="50%" stroke="rgba(255,255,255,0.1)" strokeWidth="1"/>
-          {/* Linhas verticais das zonas */}
-          <line x1="50%" y1="0" x2="50%" y2="100%" stroke="rgba(255,255,255,0.08)" strokeWidth="1"/>
+          <ellipse cx="50%" cy="50%" rx="28%" ry="26%" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="1.5"/>
+          <line x1="0" y1="50%" x2="100%" y2="50%" stroke="rgba(255,255,255,0.08)" strokeWidth="1"/>
+          <circle cx="50%" cy="50%" r="3" fill="rgba(255,255,255,0.2)"/>
         </svg>
 
         {/* Companheiras */}
         {matePositions.map((mate, idx) => {
           const hasBall = ballOwner === idx;
-          const isReceiving = receiverIdx === idx;
           return (
-            <motion.div
-              key={idx}
+            <motion.div key={idx}
               onClick={() => passTo(idx)}
-              animate={hasBall ? { scale: [1, 1.15, 1] } : { scale: 1 }}
-              transition={{ duration: 0.5, repeat: hasBall ? Infinity : 0 }}
+              animate={hasBall ? { scale: [1, 1.12, 1] } : { scale: 1 }}
+              transition={{ duration: 0.6, repeat: hasBall ? Infinity : 0 }}
               style={{
                 position: 'absolute',
                 left: `${mate.x}%`, top: `${mate.y}%`,
                 transform: 'translate(-50%,-50%)',
-                cursor: 'pointer',
-                zIndex: 20,
+                cursor: 'pointer', zIndex: 20,
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
               }}
             >
-              {/* Bola na companheira */}
               {hasBall && (
-                <motion.div
-                  initial={{ scale: 0 }} animate={{ scale: 1 }}
-                  style={{ fontSize: 14, marginBottom: -4 }}
-                >⚽</motion.div>
+                <motion.div animate={{ y: [-3, 0, -3] }} transition={{ duration: 0.6, repeat: Infinity }}
+                  style={{ fontSize: 14, marginBottom: -4 }}>⚽</motion.div>
               )}
-              {/* Avatar */}
               <div style={{
-                width: 44, height: 44, borderRadius: '50%',
+                width: 46, height: 46, borderRadius: '50%',
                 background: hasBall
                   ? 'linear-gradient(135deg,#fbbf24,#f59e0b)'
                   : 'linear-gradient(135deg,#4ade80,#22c55e)',
-                border: hasBall ? '3px solid #fbbf24' : '2px solid rgba(255,255,255,0.5)',
+                border: hasBall ? '3px solid #fef3c7' : '2px solid rgba(255,255,255,0.5)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 22,
                 boxShadow: hasBall
-                  ? '0 0 18px rgba(251,191,36,0.7)'
-                  : ballOwner === 'player' ? '0 0 12px rgba(74,222,128,0.5)' : '0 2px 8px rgba(0,0,0,0.3)',
+                  ? '0 0 20px rgba(251,191,36,0.8)'
+                  : ballOwner === 'player'
+                    ? '0 0 14px rgba(74,222,128,0.6)'
+                    : '0 2px 8px rgba(0,0,0,0.3)',
               }}>
                 {['👧', '👧🏾', '👧🏿', '👧🏻'][idx % 4]}
               </div>
-              {/* Label "PASSAR" pulsando quando tem a bola o jogador */}
               {ballOwner === 'player' && (
                 <motion.div
-                  animate={{ opacity: [0.6, 1, 0.6], y: [0, -2, 0] }}
+                  animate={{ opacity: [0.5, 1, 0.5], y: [0, -2, 0] }}
                   transition={{ duration: 1, repeat: Infinity }}
                   style={{
-                    background: 'rgba(0,0,0,0.55)', borderRadius: 8,
-                    padding: '1px 6px', fontSize: 9, color: 'white',
-                    fontWeight: 700, letterSpacing: 0.5, marginTop: 2,
+                    background: 'rgba(0,0,0,0.6)', borderRadius: 8,
+                    padding: '1px 7px', fontSize: 9, color: 'white',
+                    fontWeight: 800, letterSpacing: 0.5,
                   }}
                 >
                   PASSAR
@@ -432,108 +474,89 @@ export default function BobinhoGame({ onStickerEarned }) {
           );
         })}
 
-        {/* Jogador (com bola) */}
+        {/* Jogador */}
         <div style={{
           position: 'absolute',
-          left: `${playerPos.x}%`, top: `${playerPos.y}%`,
+          left: `${PLAYER_POS.x}%`, top: `${PLAYER_POS.y}%`,
           transform: 'translate(-50%,-50%)',
           zIndex: 25,
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
         }}>
           {ballOwner === 'player' && (
-            <motion.div
-              animate={{ y: [-3, 0, -3] }} transition={{ duration: 0.7, repeat: Infinity }}
-              style={{ fontSize: 16, marginBottom: -2 }}
-            >⚽</motion.div>
+            <motion.div animate={{ y: [-3, 0, -3] }} transition={{ duration: 0.7, repeat: Infinity }}
+              style={{ fontSize: 16, marginBottom: -2 }}>⚽</motion.div>
           )}
           <div style={{
-            width: 50, height: 50, borderRadius: '50%',
+            width: 52, height: 52, borderRadius: '50%',
             background: ballOwner === 'player'
               ? 'linear-gradient(135deg,#3b82f6,#1d4ed8)'
               : 'linear-gradient(135deg,#64748b,#475569)',
-            border: ballOwner === 'player' ? '3px solid #60a5fa' : '2px solid rgba(255,255,255,0.3)',
+            border: ballOwner === 'player' ? '3px solid #93c5fd' : '2px solid rgba(255,255,255,0.3)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 24,
+            fontSize: 26,
             boxShadow: ballOwner === 'player'
-              ? '0 0 20px rgba(59,130,246,0.7)'
+              ? '0 0 22px rgba(59,130,246,0.7)'
               : '0 2px 8px rgba(0,0,0,0.3)',
-          }}>
-            🧑‍🦱
-          </div>
+          }}>🧑‍🦱</div>
           <div style={{
-            background: 'rgba(59,130,246,0.8)', borderRadius: 8,
-            padding: '1px 6px', fontSize: 9, color: 'white', fontWeight: 700,
-          }}>
-            VOCÊ
-          </div>
+            background: 'rgba(59,130,246,0.85)', borderRadius: 8,
+            padding: '1px 7px', fontSize: 9, color: 'white', fontWeight: 800,
+          }}>VOCÊ</div>
         </div>
 
         {/* Marcador */}
-        <motion.div
-          style={{
-            position: 'absolute',
-            left: `${defPos.x}%`, top: `${defPos.y}%`,
-            transform: 'translate(-50%,-50%)',
-            zIndex: 30,
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-          }}
-        >
+        <div style={{
+          position: 'absolute',
+          left: `${defXY.x}%`, top: `${defXY.y}%`,
+          transform: 'translate(-50%,-50%)',
+          zIndex: 30,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+          pointerEvents: 'none',
+        }}>
           <div style={{
-            width: 46, height: 46, borderRadius: '50%',
+            width: 48, height: 48, borderRadius: '50%',
             background: 'linear-gradient(135deg,#dc2626,#ef4444)',
             border: '2px solid rgba(255,255,255,0.4)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 22,
-            boxShadow: `0 0 ${12 + dangerLevel * 20}px rgba(239,68,68,${0.4 + dangerLevel * 0.5})`,
-          }}>
-            😤
-          </div>
+            fontSize: 24,
+            boxShadow: `0 0 ${10 + dangerLevel * 22}px rgba(239,68,68,${0.4 + dangerLevel * 0.5})`,
+          }}>😤</div>
           <div style={{
             background: 'rgba(220,38,38,0.85)', borderRadius: 8,
-            padding: '1px 6px', fontSize: 9, color: 'white', fontWeight: 700,
-          }}>
-            MARCADOR
-          </div>
-        </motion.div>
+            padding: '1px 7px', fontSize: 9, color: 'white', fontWeight: 800,
+          }}>MARCADOR</div>
+        </div>
 
-        {/* Animação da bola voando */}
+        {/* Bola voando no passe */}
         <AnimatePresence>
           {passAnim && (
-            <motion.div
-              key="ball-anim"
-              initial={{ left: `${passAnim.from.x}%`, top: `${passAnim.from.y}%`, scale: 1.2 }}
-              animate={{ left: `${passAnim.to.x}%`, top: `${passAnim.to.y}%`, scale: 0.9 }}
+            <motion.div key="ball"
+              initial={{ left: `${passAnim.from.x}%`, top: `${passAnim.from.y}%`, scale: 1.3, opacity: 1 }}
+              animate={{ left: `${passAnim.to.x}%`,   top: `${passAnim.to.y}%`,   scale: 0.9, opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.32, ease: 'easeOut' }}
               style={{
-                position: 'absolute',
-                transform: 'translate(-50%,-50%)',
-                fontSize: 20, zIndex: 40, pointerEvents: 'none',
+                position: 'absolute', transform: 'translate(-50%,-50%)',
+                fontSize: 22, zIndex: 40, pointerEvents: 'none',
               }}
-            >
-              ⚽
-            </motion.div>
+            >⚽</motion.div>
           )}
         </AnimatePresence>
 
-        {/* Levelup overlay */}
+        {/* Level up overlay */}
         <AnimatePresence>
-          {phase === 'levelup' && (
-            <motion.div
-              key="levelup"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
+          {levelupMsg && (
+            <motion.div key="lvlup"
+              initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
               style={{
-                position: 'absolute', inset: 0,
-                background: 'rgba(21,128,61,0.92)',
+                position: 'absolute', inset: 0, background: 'rgba(21,128,61,0.93)',
                 display: 'flex', flexDirection: 'column',
                 alignItems: 'center', justifyContent: 'center',
                 zIndex: 60, borderRadius: 18,
               }}
             >
               <div style={{ fontSize: 52 }}>🎉</div>
-              <div style={{ color: 'white', fontWeight: 900, fontSize: 26, fontFamily: 'system-ui' }}>Nível {level + 1} completo!</div>
+              <div style={{ color: 'white', fontWeight: 900, fontSize: 26 }}>Nível {level + 1} completo!</div>
               <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, marginTop: 6 }}>
                 {LEVELS[level + 1]?.label || ''}
               </div>
@@ -542,21 +565,19 @@ export default function BobinhoGame({ onStickerEarned }) {
         </AnimatePresence>
       </div>
 
-      {/* Dica */}
-      <motion.p
-        key={dangerLevel > 0.7 ? 'danger' : 'normal'}
-        initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-        className={`text-sm font-semibold text-center ${dangerLevel > 0.7 ? 'text-red-500' : 'text-gray-500'}`}
-      >
-        {dangerLevel > 0.7 ? '⚠️ PASSA LOGO!' : ballOwner === 'player' ? 'Toque numa companheira para passar' : 'Companheira com a bola — marcador veio atrás!'}
-      </motion.p>
+      {/* Dica dinâmica */}
+      <p className={`text-sm font-semibold text-center transition-colors ${dangerLevel > 0.7 ? 'text-red-500' : 'text-gray-500'}`}>
+        {dangerLevel > 0.7
+          ? '⚠️ PASSA LOGO!'
+          : ballOwner === 'player'
+            ? 'Toque numa companheira para passar'
+            : 'Companheira segura — marcador foi buscar!'}
+      </p>
 
-      {/* Info do nível */}
       <div className="text-xs text-gray-400 text-center">{cfg.desc}</div>
 
-      {/* Restart */}
       <motion.button whileTap={{ scale: 0.9 }}
-        onClick={() => { setPasses(0); setScore(0); setLives(3); initLevel(0); }}
+        onClick={() => { initLevel(0, 3, 0, 0); }}
         className="flex items-center gap-2 text-gray-400 text-sm mt-1"
       >
         <RotateCcw className="w-4 h-4" /> Recomeçar
