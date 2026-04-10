@@ -124,7 +124,6 @@ function saveStoryProgress(progress) {
 
 export default function Story() {
   const navigate = useNavigate();
-  const { showToast, StickerToast } = useStickerToast();
 
   // Merge saved progress into chapters
   const initChapters = () => {
