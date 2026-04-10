@@ -10,6 +10,8 @@ import PassGame from '@/components/training/PassGame';
 import DribbleGame from '@/components/training/DribbleGame';
 import BallControlGame from '@/components/training/BallControlGame';
 import PursuitGame from '@/components/training/PursuitGame';
+import ConductGame from '@/components/training/ConductGame';
+import BobinhoGame from '@/components/training/BobinhoGame';
 
 // Larger modules
 import EnglishGame from '@/components/training/EnglishGame';
@@ -27,6 +29,8 @@ const TRAINING_MODULES = [
   { id: 'dribble',       label: 'Zig Zague',            emoji: '⚡',  desc: 'Zigue-zague pelos cones - bata a adversaria!',  color: 'from-yellow-500 to-orange-500',  component: DribbleGame },
   { id: 'control',       label: 'Condução',             emoji: '🏃‍♀️', desc: 'Desvie das defensoras e avance!',               color: 'from-teal-500 to-cyan-500',      component: BallControlGame },
   { id: 'pursuit',       label: 'Drible c/ Marcador',   emoji: '🔥',  desc: 'Fuja da marcadora e chegue ao gol!',            color: 'from-accent to-pink-500',        component: PursuitGame },
+  { id: 'conduct',       label: 'Leva pro Gol',         emoji: '🎯',  desc: 'Quadra 5x5 — desvie dos obstáculos e marque!', color: 'from-emerald-500 to-teal-600',   component: ConductGame },
+  { id: 'bobinho',       label: 'Bobinho',              emoji: '⚽',  desc: 'Passe antes que o marcador te pegue!',         color: 'from-violet-500 to-purple-600',  component: BobinhoGame },
   { id: 'english',       label: 'Inglês do Futebol',    emoji: '🇺🇸', desc: '10 níveis · vocabulário · 50 figurinhas',       color: 'from-blue-600 to-indigo-700',    component: EnglishGame },
   { id: 'story',         label: 'Modo Carreira',        emoji: '👑',  desc: 'A jornada de uma jogadora!',                    color: 'from-rose-500 to-pink-600',      component: StoryGame },
   { id: 'fundamentos',   label: 'Fundamentos',          emoji: '📚',  desc: 'Regras, posições e técnicas do futsal',         color: 'from-green-600 to-emerald-700',  component: FundamentosGame },
