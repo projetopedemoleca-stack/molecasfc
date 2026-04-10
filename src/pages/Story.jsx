@@ -5,6 +5,8 @@ import { ArrowLeft, Lock, CheckCircle2 } from 'lucide-react';
 import { TEAMS } from '@/lib/gameData';
 import { audio } from '@/lib/audioEngine';
 import ChapterQuiz from '@/components/story/ChapterQuiz';
+import { drawSticker, addSticker } from '@/lib/albumSystem.js';
+import { useStickerToast } from '@/components/ui/StickerEarnedToast.jsx';
 
 // ────────────────────────────────────────────────────────────────
 // Chapters
@@ -124,6 +126,7 @@ function saveStoryProgress(progress) {
 
 export default function Story() {
   const navigate = useNavigate();
+  const { showToast, StickerToast } = useStickerToast();
 
   // Merge saved progress into chapters
   const initChapters = () => {
@@ -165,6 +168,11 @@ export default function Story() {
       persistProgress(updated);
       return updated;
     });
+    // Ganhar figurinha ao completar capítulo
+    const rarity = id >= 10 ? 'epic' : id >= 7 ? 'rare' : id >= 4 ? 'uncommon' : null;
+    const def = drawSticker('story', rarity);
+    const result = addSticker(def.id, 'story', true);
+    if (result) showToast({ ...result, definition: def });
   };
 
   const handleChapterClick = (ch) => {
@@ -416,5 +424,6 @@ export default function Story() {
         )}
       </AnimatePresence>
     </div>
+    {StickerToast}
   );
 }

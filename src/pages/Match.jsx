@@ -9,7 +9,8 @@ import { audio } from '@/lib/audioEngine';
 import { loadProfile, saveMatchResult, unlockScene, addWinXP } from '@/lib/playerProfile';
 import MatchSetupScreen from '@/components/game/MatchSetupScreen';
 import DailyChallengeCard, { getDailyChallengeStatus, getTodayChallenge, markChallengeCompleted } from '@/components/match/DailyChallengeCard';
-import { earnFromMatch } from '@/lib/albumSystem.js';
+import { earnFromMatch, drawSticker, addSticker } from '@/lib/albumSystem.js';
+import { useStickerToast } from '@/components/ui/StickerEarnedToast.jsx';
 
 // --- Toast de conquista ----------------------------------------
 function AchievementToast({ achievements, onDone }) {
@@ -747,6 +748,7 @@ function GameOverScreen({ data, onPlayAgain, onHome }) {
 
 export default function Match() {
   const navigate = useNavigate();
+  const { showToast, StickerToast } = useStickerToast();
   const urlParams = new URLSearchParams(window.location.search);
   const teamId = urlParams.get('team') || 'pe_de_moleca';
   const opponentId = urlParams.get('opponent') || 'turminha_fc';
@@ -1086,7 +1088,9 @@ export default function Match() {
       const lvRes = addWinXP({ playerId: pid, teamId: tid, xpAmount: 40 });
       if (lvRes.playerLevelUp || lvRes.teamLevelUp) setLevelUpInfo(lvRes);
       // Ganhar figurinha por vencer
-      earnFromMatch(true, ps);
+      const def = drawSticker('match', ps >= 5 ? 'epic' : ps >= 3 ? 'rare' : undefined);
+      const stickerResult = addSticker(def.id, 'match', true);
+      if (stickerResult) showToast({ ...stickerResult, definition: def });
     }
     try {
       const res = saveMatchResult?.({ won, draw, playerGoals: ps, opponentGoals: os,
@@ -1432,7 +1436,7 @@ export default function Match() {
           </motion.div>
         )}
       </AnimatePresence>
-
+      {StickerToast}
     </div>
   );
 }

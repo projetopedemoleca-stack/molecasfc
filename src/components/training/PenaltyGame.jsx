@@ -5,6 +5,8 @@ import { PLAYERS } from '@/lib/gameData';
 import { loadProfile } from '@/lib/playerProfile';
 import { bgMusic } from '@/lib/trainingMusic';
 import { LevelBadge } from './TrainingHelpers';
+import { drawSticker, addSticker } from '@/lib/albumSystem.js';
+import { useStickerToast } from '@/components/ui/StickerEarnedToast.jsx';
 
 // 9 quadrantes do gol: linha 0=topo, 1=meio, 2=baixo | col 0=esq, 1=centro, 2=dir
 const QUADS = [
@@ -36,6 +38,7 @@ const MAX = 5;
 export default function PenaltyGame() {
   useEffect(() => { bgMusic.play('sport'); return () => bgMusic.stop(); }, []);
 
+  const { showToast, StickerToast } = useStickerToast();
   const profile = loadProfile?.() || {};
   const playerId = profile?.selectedPlayerId || 'luna';
   const playerData = PLAYERS.find(p => p.id === playerId) || PLAYERS[0];
@@ -302,7 +305,17 @@ export default function PenaltyGame() {
 
       {/* Tela final */}
       {phase === 'done' && (
-        <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center space-y-3 pt-2">
+        <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+          className="text-center space-y-3 pt-2"
+          onAnimationComplete={() => {
+            if (score >= 2) {
+              const rarity = score >= 5 ? 'epic' : score >= 4 ? 'rare' : 'uncommon';
+              const def = drawSticker('minigame_penalty', rarity);
+              const result = addSticker(def.id, 'minigame_penalty', true);
+              if (result) showToast({ ...result, definition: def });
+            }
+          }}
+        >
           <motion.div animate={{ y: [0, -10, 0] }} transition={{ repeat: Infinity, duration: 1.5 }} className="text-5xl">
             {score >= 4 ? '🏆' : score >= 2 ? '👍' : '💪'}
           </motion.div>
@@ -316,5 +329,6 @@ export default function PenaltyGame() {
         </motion.div>
       )}
     </div>
+    {StickerToast}
   );
 }
