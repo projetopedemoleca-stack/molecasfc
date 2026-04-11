@@ -4,14 +4,46 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { bgMusic } from '@/lib/trainingMusic';
 
+class TrainingErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidUpdate(prevProps) {
+    if (prevProps.active !== this.props.active && this.state.error) {
+      this.setState({ error: null });
+    }
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="max-w-sm mx-auto p-6 bg-red-50 border border-red-200 rounded-3xl text-center">
+          <p className="text-sm font-bold text-red-700">Erro ao carregar o jogo.</p>
+          <p className="mt-3 text-xs text-red-600 break-words">{this.state.error.message}</p>
+          <button onClick={() => this.setState({ error: null })} className="mt-4 px-4 py-2 rounded-2xl bg-red-600 text-white text-sm">
+            Voltar
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // Mini-game components
 import PenaltyGame from '@/components/training/PenaltyGame';
 import PassGame from '@/components/training/PassGame';
 import DribbleGame from '@/components/training/DribbleGame';
+import DribbleGameV1 from '@/components/training/DribbleGameV1';
+import DribbleGameV2 from '@/components/training/DribbleGameV2';
 import BallControlGame from '@/components/training/BallControlGame';
 import PursuitGame from '@/components/training/PursuitGame';
-import ConductGame from '@/components/training/ConductGame';
-import BobinhoGame from '@/components/training/BobinhoGame';
 
 // Larger modules
 import EnglishGame from '@/components/training/EnglishGame';
@@ -26,11 +58,11 @@ import DiarioMenstrual from '@/components/training/DiarioMenstrual';
 const TRAINING_MODULES = [
   { id: 'penalty',       label: 'Penalti',             emoji: '⚽',  desc: 'Chute nos 9 quadrantes - engane a goleira!',   color: 'from-primary to-green-500',     component: PenaltyGame },
   { id: 'pass',          label: 'Passe',                emoji: '🎯',  desc: 'Reação e timing perfeito',                      color: 'from-blue-500 to-blue-600',      component: PassGame },
-  { id: 'dribble',       label: 'Fut de Rua',           emoji: '🥫',  desc: '1x1 na rua - escolha sua bola e desvie!',     color: 'from-amber-500 to-orange-600',   component: DribbleGame },
+  { id: 'dribble',       label: 'Fut de Rua Original',  emoji: '🥫',  desc: '1x1 na rua - escolha sua bola!',                color: 'from-amber-500 to-orange-600', component: DribbleGame },
+  { id: 'dribblev1',     label: 'Fut de Rua V1',        emoji: '⚽',  desc: 'Arraste para mirar e chutar!',                  color: 'from-green-500 to-teal-600',   component: DribbleGameV1 },
+  { id: 'dribblev2',     label: 'Fut de Rua V2',        emoji: '🎮',  desc: 'Joystick para fugir do marcador!',              color: 'from-orange-500 to-red-600',   component: DribbleGameV2 },
   { id: 'control',       label: 'Condução',             emoji: '🏃‍♀️', desc: 'Desvie das defensoras e avance!',               color: 'from-teal-500 to-cyan-500',      component: BallControlGame },
   { id: 'pursuit',       label: 'Drible c/ Marcador',   emoji: '🔥',  desc: 'Fuja da marcadora e chegue ao gol!',            color: 'from-accent to-pink-500',        component: PursuitGame },
-  { id: 'conduct',       label: 'Leva pro Gol',         emoji: '🎯',  desc: 'Quadra 5x5 — desvie dos obstáculos e marque!', color: 'from-emerald-500 to-teal-600',   component: ConductGame },
-  { id: 'bobinho',       label: 'Bobinho',              emoji: '⚽',  desc: 'Passe antes que o marcador te pegue!',         color: 'from-violet-500 to-purple-600',  component: BobinhoGame },
   { id: 'english',       label: 'Inglês do Futebol',    emoji: '🇺🇸', desc: '10 níveis · vocabulário · 50 figurinhas',       color: 'from-blue-600 to-indigo-700',    component: EnglishGame },
   { id: 'story',         label: 'Modo Carreira',        emoji: '👑',  desc: 'A jornada de uma jogadora!',                    color: 'from-rose-500 to-pink-600',      component: StoryGame },
   { id: 'fundamentos',   label: 'Fundamentos',          emoji: '📚',  desc: 'Regras, posições e técnicas do futsal',         color: 'from-green-600 to-emerald-700',  component: FundamentosGame },
