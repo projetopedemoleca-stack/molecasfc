@@ -4,14 +4,21 @@ const bgMusic = (() => {
   let currentTrack = null, currentStep = 0, muted = false;
 
   const ctx = () => {
-    if (!actx) {
-      actx = new (window.AudioContext || window.webkitAudioContext)();
-      masterGain = actx.createGain();
-      masterGain.gain.value = 0.13;
-      masterGain.connect(actx.destination);
+    try {
+      if (!actx) {
+        actx = new (window.AudioContext || window.webkitAudioContext)();
+        masterGain = actx.createGain();
+        masterGain.gain.value = 0.13;
+        masterGain.connect(actx.destination);
+      }
+      if (actx.state === 'suspended') actx.resume();
+      return actx;
+    } catch (e) {
+      console.warn('bgMusic audio context failed:', e);
+      actx = null;
+      masterGain = null;
+      return null;
     }
-    if (actx.state === 'suspended') actx.resume();
-    return actx;
   };
 
   const osc = (freq, type, dur, vol) => {
@@ -111,13 +118,18 @@ const bgMusic = (() => {
 
   return {
     play(trackName) {
-      if (currentTrack === trackName) return;
-      stop();
-      currentTrack = trackName;
-      currentStep = 0;
-      const bpm = TRACKS[trackName]?.bpm || 130;
-      const ms = (60000 / bpm) / 2;
-      timerId = setInterval(tick, ms);
+      try {
+        if (currentTrack === trackName) return;
+        stop();
+        currentTrack = trackName;
+        currentStep = 0;
+        const bpm = TRACKS[trackName]?.bpm || 130;
+        const ms = (60000 / bpm) / 2;
+        timerId = setInterval(tick, ms);
+      } catch (e) {
+        console.warn('bgMusic play failed:', e);
+        stop();
+      }
     },
     stop,
     toggleMute() {

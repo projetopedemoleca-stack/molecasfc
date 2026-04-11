@@ -32,10 +32,17 @@ const QUIZ_SIZE = 6;
 const SPELLING_ROUNDS = 5;
 
 function loadProgress() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || { unlockedLevel: 1, earnedStickers: [] }; }
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return { unlockedLevel: 1, earnedStickers: [] };
+    return JSON.parse(stored);
+  }
   catch { return { unlockedLevel: 1, earnedStickers: [] }; }
 }
-function saveProgress(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+function saveProgress(data) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+  catch { /* fail silently */ }
+}
 
 // Embaralha uma lista sem modificar o original
 function shuffle(arr) {
@@ -276,7 +283,6 @@ function SpellingChallenge({ level, miniScore, setMiniScore, onDone, onBack }) {
 export default function EnglishGame() {
   useEffect(() => { bgMusic.play('english'); return () => bgMusic.stop(); }, []);
 
-  const { showToast, StickerToast } = useStickerToast();
   const [progress, setProgress] = useState(loadProgress);
   const [view, setView] = useState('menu');
   const [lvlIdx, setLvlIdx] = useState(0);
@@ -296,17 +302,6 @@ export default function EnglishGame() {
   const level = LEVELS[lvlIdx];
   const WORDS_PER_PAGE = 5;
   const totalPages = Math.ceil(level.words.length / WORDS_PER_PAGE);
-
-  // Ganhar figurinha ao passar no quiz ou mini-game
-  const earnStickerReward = (scoreVal, source = 'english') => {
-    let rarity = null;
-    if (scoreVal >= 6) rarity = 'epic';
-    else if (scoreVal >= 5) rarity = 'rare';
-    else if (scoreVal >= 4) rarity = 'uncommon';
-    const def = drawSticker(source, rarity);
-    const result = addSticker(def.id, source, true);
-    if (result) showToast({ ...result, definition: def });
-  };
 
   const startLesson = (idx) => { setLvlIdx(idx); setWordPage(0); setView('lesson'); };
 
@@ -329,13 +324,22 @@ export default function EnglishGame() {
         if (nextUnlock > newProgress.unlockedLevel) newProgress.unlockedLevel = nextUnlock;
         setProgress(newProgress);
         saveProgress(newProgress);
-        earnStickerReward(s, 'english');
       }
       setView('result');
     } else {
       setGameIdx(gameIdx + 1);
     }
   };
+
+  // Calcula as opções do jogo uma vez por renderização
+  const gameOptions = useMemo(() => {
+    if (gamePool.length === 0) return [];
+    const current = gamePool[gameIdx] || gamePool[0];
+    if (!current) return [];
+    const others = gamePool.filter(w => w.en !== current.en);
+    return shuffle([...others.slice(0, 2), current]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameIdx, gamePool]);
 
   const handleMicRecord = (word) => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -384,7 +388,7 @@ export default function EnglishGame() {
 
   // === MENU ===
   if (view === 'menu') return (
-    <><StickerToast />
+    <>
       <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="text-center">
         <span className="text-5xl block mb-2">🇺🇸</span>
         <h2 className="font-heading font-bold text-3xl">Inglês do Futebol</h2>
@@ -419,7 +423,7 @@ export default function EnglishGame() {
   if (view === 'lesson') {
     const words = level.words.slice(wordPage * WORDS_PER_PAGE, (wordPage + 1) * WORDS_PER_PAGE);
     return (
-      <><StickerToast /><div className="space-y-4">
+      <><div className="space-y-4">
         <div className="flex items-center gap-3">
           <button onClick={() => setView('menu')} className="text-muted-foreground hover:text-foreground">
             <ArrowLeft className="w-5 h-5" />
@@ -495,7 +499,6 @@ export default function EnglishGame() {
         onDone={(finalMiniScore) => {
           setFinalScore(finalMiniScore);
           setMiniGame(null);
-          earnStickerReward(finalMiniScore, 'english_spelling');
           setView('result');
         }}
         onBack={() => setMiniGame(null)}
@@ -544,7 +547,6 @@ export default function EnglishGame() {
             onClick={() => {
               const s = miniScore + 4;
               setFinalScore(s);
-              earnStickerReward(s, 'english_memory');
               setMiniGame(null);
               setView('result');
             }}
@@ -558,14 +560,7 @@ export default function EnglishGame() {
 
   // === QUIZ PRINCIPAL ===
   if (view === 'game' && gamePool.length > 0 && !miniGame) {
-    const current = gamePool[gameIdx];
-    // Opções fixas para não embaralhar a cada render
-    const options = useMemo(() => {
-      const others = gamePool.filter(w => w.en !== current.en);
-      return shuffle([...others.slice(0, 2), current]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [gameIdx, gamePool]);
-
+    const current = gamePool[gameIdx] || gamePool[0];
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -585,7 +580,7 @@ export default function EnglishGame() {
         </motion.div>
 
         <div className="grid grid-cols-1 gap-2.5">
-          {options.map((opt, idx) => (
+          {gameOptions.map((opt, idx) => (
             <motion.button key={opt.en}
               initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
               transition={{ delay: idx * 0.1 }}
@@ -670,5 +665,5 @@ export default function EnglishGame() {
     );
   }
 
-  return <><StickerToast /></>;
+  return <></>;
 }

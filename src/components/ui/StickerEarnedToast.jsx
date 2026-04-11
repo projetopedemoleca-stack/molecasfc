@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RARITY_CONFIG as RARITY } from '@/lib/unifiedStickers.js';
+import { RARITY } from '@/lib/stickersData.js';
 
 const rarityStyle = {
   common:    { border: 'border-gray-400',   bg: 'from-gray-100 to-gray-200',     badge: 'bg-gray-400'   },
