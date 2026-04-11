@@ -5,6 +5,15 @@ import { motion } from 'framer-motion';
 // CONSTANTES
 // ═══════════════════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════════════════
+// TIPOS E CONSTANTES
+// ═══════════════════════════════════════════════════════════════════════════
+
+const CHARACTERS = [
+  { id: 'boy', name: 'Menino', emoji: '👦', speed: 1.0, desc: 'Equilibrado' },
+  { id: 'girl', name: 'Menina', emoji: '👧', speed: 1.1, desc: 'Mais rápida' },
+];
+
 const BALL_TYPES = [
   { id: 'head',   name: 'Cabeça de Boneca', emoji: '🧠', speed: 0.95, desc: 'Leve e imprevisível' },
   { id: 'can',    name: 'Lata',         emoji: '🥫', speed: 0.80, desc: 'Pesada e reta' },
@@ -21,6 +30,7 @@ const OBSTACLE_TYPES = [
   { id: 'cat',  name: 'Gato',            emoji: '🐱', behavior: 'patrol', desc: 'Passeia pelo local' },
   { id: 'bike', name: 'Bicicleta',       emoji: '🚲', behavior: 'parked', desc: 'Estacionada no canto' },
   { id: 'bin',  name: 'Lixeira',         emoji: '🗑️', behavior: 'static', desc: 'Obstáculo fixo' },
+  { id: 'oldlady', name: 'Velhinha',    emoji: '👵', behavior: 'crossing', desc: 'Cruzando a rua lentamente' },
 ];
 
 const LEVELS = [
@@ -60,13 +70,14 @@ export default function DribbleGame({ onStickerEarned }) {
   const [timeLeft, setTimeLeft] = useState(60);
 
   // Seleção
+  const [selectedCharacter, setSelectedCharacter] = useState(CHARACTERS[0]);
   const [selectedBall, setSelectedBall] = useState(BALL_TYPES[0]);
-  const [selectedObstacles, setSelectedObstacles] = useState([]);
+  const [selectedObstacles, setSelectedObstacles] = useState([]); // @type {ObstacleType[]}
 
   // Posições
   const [playerPos, setPlayerPos] = useState({ x: FIELD_W / 2, y: FIELD_H - 50 });
   const [botPos, setBotPos] = useState({ x: FIELD_W / 2, y: 50 });
-  const [obstaclePositions, setObstaclePositions] = useState([]);
+  const [obstaclePositions, setObstaclePositions] = useState([]); // @type {Obstacle[]}
 
   // Controle
   const [velocity, setVelocity] = useState({ x: 0, y: 0 });
@@ -74,7 +85,7 @@ export default function DribbleGame({ onStickerEarned }) {
 
   // Refs
   const velocityRef = useRef({ x: 0, y: 0 });
-  const loopRef = useRef(null);
+  const loopRef = useRef(null); // @type {number|null}
   const playerStartRef = useRef({ x: FIELD_W / 2, y: FIELD_H - 50 });
 
   const config = LEVELS[level] || LEVELS[0];
@@ -139,7 +150,7 @@ export default function DribbleGame({ onStickerEarned }) {
     const gameLoop = () => {
       const vx = velocityRef.current.x;
       const vy = velocityRef.current.y;
-      const speed = 3.5 * selectedBall.speed;
+      const speed = 3.5 * selectedCharacter.speed;
 
       // Atualizar posição do jogador
       setPlayerPos(prev => {
@@ -168,6 +179,13 @@ export default function DribbleGame({ onStickerEarned }) {
             return { ...obs, dir: -obs.dir };
           }
           return { ...obs, x: newX };
+        } else if (obs.type.behavior === 'crossing') {
+          // Velhinha cruzando lentamente
+          let newY = obs.y + obs.speed * 0.3;
+          if (newY > FIELD_H + 30) {
+            newY = -30; // Reinicia do topo
+          }
+          return { ...obs, y: newY };
         }
         return obs;
       }));
@@ -179,7 +197,7 @@ export default function DribbleGame({ onStickerEarned }) {
     return () => {
       if (loopRef.current) cancelAnimationFrame(loopRef.current);
     };
-  }, [phase, playerPos, botPos, config, selectedBall]);
+  }, [phase, playerPos, botPos, config, selectedCharacter]);
 
   // Verificar colisões e gols
   useEffect(() => {
@@ -323,6 +341,11 @@ export default function DribbleGame({ onStickerEarned }) {
   // ═══════════════════════════════════════════════════════════════════════════
   // HANDLERS DE SELEÇÃO
   // ═══════════════════════════════════════════════════════════════════════════
+
+  const handleSelectCharacter = (character) => {
+    setSelectedCharacter(character);
+    setPhase('ball-select');
+  };
 
   const handleSelectBall = (ball) => {
     setSelectedBall(ball);
