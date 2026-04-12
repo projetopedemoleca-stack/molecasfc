@@ -126,7 +126,11 @@ export default function CharacterSelect() {
   const handleConfirm = () => {
     audio.playSelect();
     saveProfile({ ...profile, selectedPlayerId: selectedId, uniformColor: shirtColor, shortsColor, bootsColor, teamBadge });
-    navigate('/team-select');
+    if (selectedId === 'custom') {
+      navigate('/match');
+    } else {
+      navigate('/team-select');
+    }
   };
 
   const handleSelectPlayer = (id) => {

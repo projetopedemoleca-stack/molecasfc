@@ -55,6 +55,7 @@ export default function DribbleGame() {
   const [timeLeft, setTimeLeft] = useState(60);
   const [lives, setLives] = useState(3);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [ballOwner, setBallOwner] = useState('player');
 
   // Seleção
   const [selectedBall, setSelectedBall] = useState(BALL_TYPES[0]);
@@ -104,6 +105,7 @@ export default function DribbleGame() {
     setTimeLeft(LEVELS[lvl].time);
     setPlayerPos({ x: FIELD_W / 2, y: FIELD_H - 80 });
     setBotPos({ x: FIELD_W / 2, y: 120 });
+    setBallOwner('player');
     generateObstacles();
     setPhase('playing');
     playSound('start');
@@ -122,10 +124,13 @@ export default function DribbleGame() {
         y: clamp(prev.y + joystick.y * speed, PLAYER_R, FIELD_H - PLAYER_R),
       }));
 
-      // Bot persegue o jogador
+      // Bot: persegue jogador (sem bola) ou vai pro gol (com bola)
       setBotPos(prev => {
-        const dx = playerPos.x - prev.x;
-        const dy = playerPos.y - prev.y;
+        const target = ballOwner === 'bot'
+          ? { x: FIELD_W / 2, y: 30 }  // gol do topo
+          : playerPos;                   // perseguir jogador
+        const dx = target.x - prev.x;
+        const dy = target.y - prev.y;
         const d = Math.sqrt(dx * dx + dy * dy) || 1;
         const botSpeed = config.botSpeed;
         return {
@@ -154,17 +159,34 @@ export default function DribbleGame() {
         return obs;
       }));
 
-      // Colisão com bot
+      // Colisão com bot — troca de posse
       if (dist(playerPos, botPos) < PLAYER_R + BOT_R - 5) {
+        setBallOwner(prev => {
+          if (prev === 'player') {
+            // Bot rouba a bola
+            setShowHitEffect(true);
+            playSound('lose');
+            setTimeout(() => setShowHitEffect(false), 600);
+            return 'bot';
+          } else {
+            // Jogador recupera a bola
+            setShowGoalEffect(false);
+            playSound('pass');
+            return 'player';
+          }
+        });
+      }
+
+      // Bot marcou gol!
+      if (ballOwner === 'bot' && botPos.y < 50 && Math.abs(botPos.x - FIELD_W / 2) < GOAL_W / 2 + 20) {
+        setBallOwner('player');
         const newLives = lives - 1;
         setLives(newLives);
         setShowHitEffect(true);
         playSound('lose');
-        setTimeout(() => setShowHitEffect(false), 500);
-        
+        setTimeout(() => setShowHitEffect(false), 800);
         if (newLives <= 0) {
           setPhase('result');
-          playSound('gameover');
         } else {
           setPlayerPos({ x: FIELD_W / 2, y: FIELD_H - 80 });
           setBotPos({ x: FIELD_W / 2, y: 120 });
@@ -213,7 +235,7 @@ export default function DribbleGame() {
 
     rafRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [phase, joystick, playerPos, botPos, obstaclePositions, goals, level, score, config, lives, selectedBall, initLevel]);
+  }, [phase, joystick, playerPos, botPos, obstaclePositions, goals, level, score, config, lives, selectedBall, initLevel, ballOwner]);
 
   // Timer
   useEffect(() => {
@@ -589,7 +611,7 @@ export default function DribbleGame() {
             transition={{ duration: 0.3 }}
           >
             <div 
-              className="w-11 h-11 rounded-full flex items-center justify-center text-xl shadow-lg border-2 border-white"
+              className="w-11 h-11 rounded-full flex items-center justify-center text-xl shadow-lg border-2 border-white relative"
               style={{
                 background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
                 boxShadow: dist(playerPos, botPos) < 60 
@@ -598,6 +620,17 @@ export default function DribbleGame() {
               }}
             >
               😤
+              {/* Bola com o bot */}
+              {ballOwner === 'bot' && (
+                <motion.div
+                  className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-sm shadow-md border border-gray-300"
+                  style={{ background: 'white' }}
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                >
+                  {selectedBall.emoji}
+                </motion.div>
+              )}
             </div>
             {dist(playerPos, botPos) < 80 && (
               <motion.div
@@ -627,15 +660,17 @@ export default function DribbleGame() {
               }}
             >
               👧
-              {/* Bola com o jogador */}
-              <motion.div 
-                className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-sm shadow-md border border-gray-300"
-                style={{ background: 'white' }}
-                animate={{ rotate: joystick.active ? 360 : 0 }}
-                transition={{ duration: 0.5 }}
-              >
-                {selectedBall.emoji}
-              </motion.div>
+              {/* Bola com o jogador — só mostra quando ballOwner === 'player' */}
+              {ballOwner === 'player' && (
+                <motion.div 
+                  className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-sm shadow-md border border-gray-300"
+                  style={{ background: 'white' }}
+                  animate={{ rotate: joystick.active ? 360 : 0 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  {selectedBall.emoji}
+                </motion.div>
+              )}
             </div>
           </motion.div>
 
@@ -709,6 +744,26 @@ export default function DribbleGame() {
             </div>
           </div>
         </div>
+
+        {ballOwner === 'player' && playerPos.y < 180 && phase === 'playing' && (
+          <motion.button
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            whileTap={{ scale: 0.85 }}
+            onClick={() => {
+              // Simula chute: move bola em direção ao centro do gol
+              setPlayerPos({ x: FIELD_W / 2, y: FIELD_H - 80 });
+              setGoals(g => g + 1);
+              setScore(s => s + (level + 1) * 15);
+              setShowGoalEffect(true);
+              playSound('win');
+              setTimeout(() => setShowGoalEffect(false), 1500);
+            }}
+            className="w-full max-w-xs py-4 rounded-2xl font-heading font-bold text-xl text-white shadow-xl bg-gradient-to-r from-green-500 to-emerald-600"
+          >
+            ⚽ CHUTAR!
+          </motion.button>
+        )}
       </div>
     );
   }

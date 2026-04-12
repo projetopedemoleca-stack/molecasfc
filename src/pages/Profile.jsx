@@ -34,14 +34,14 @@ const HAIR_COLORS = [
 ];
 
 const HAIR_STYLES = [
-  { id: 'hs1', label: 'Curto liso',   emoji: '👧' },
-  { id: 'hs2', label: 'Médio liso',   emoji: '👱‍♀️' },
-  { id: 'hs3', label: 'Longo liso',   emoji: '👩' },
-  { id: 'hs4', label: 'Cacheado',     emoji: '🧑‍🦱' },
-  { id: 'hs5', label: 'Rabo ponei',   emoji: '🎀' },
-  { id: 'hs6', label: 'Tranças',      emoji: '🧑‍🦲' },
-  { id: 'hs7', label: 'Afro',         emoji: '👸🏾' },
-  { id: 'hs8', label: 'Joãozinho',    emoji: '✂️' },
+  { id: 'hs1', label: 'Curto com franja', emoji: '✂️' },
+  { id: 'hs2', label: 'Bob curto', emoji: '💇‍♀️' },
+  { id: 'hs3', label: 'Longo liso', emoji: '👩' },
+  { id: 'hs4', label: 'Cachos', emoji: '🌀' },
+  { id: 'hs5', label: 'Rabo alto', emoji: '🎀' },
+  { id: 'hs6', label: 'Tranças', emoji: '🪢' },
+  { id: 'hs7', label: 'Afro', emoji: '☁️' },
+  { id: 'hs8', label: 'Pixie curto', emoji: '⚡' },
 ];
 
 const UNIFORM_COLORS = [
@@ -86,14 +86,87 @@ function CustomAvatar({ skin, hairColor, hairStyle, uniformColor, shortsColor, b
 
   // Caminhos de cabelo por estilo
   const hairTop = {
-    hs1: <rect x="38" y="14" width="44" height="14" rx="7" fill={hColor} />,
-    hs2: <><rect x="34" y="12" width="52" height="18" rx="9" fill={hColor} /><rect x="34" y="26" width="8" height="16" rx="4" fill={hColor} /><rect x="78" y="26" width="8" height="16" rx="4" fill={hColor} /></>,
-    hs3: <><rect x="33" y="12" width="54" height="18" rx="9" fill={hColor} /><rect x="33" y="26" width="8" height="28" rx="4" fill={hColor} /><rect x="79" y="26" width="8" height="28" rx="4" fill={hColor} /></>,
-    hs4: <><ellipse cx="60" cy="20" rx="28" ry="13" fill={hColor} /><circle cx="38" cy="30" r="7" fill={hColor} /><circle cx="82" cy="30" r="7" fill={hColor} /><circle cx="45" cy="38" r="5" fill={hColor} /><circle cx="75" cy="38" r="5" fill={hColor} /></>,
-    hs5: <><rect x="36" y="13" width="48" height="14" rx="7" fill={hColor} /><rect x="55" y="24" width="10" height="24" rx="5" fill={hColor} /></>,
-    hs6: <><rect x="35" y="13" width="50" height="14" rx="7" fill={hColor} /><rect x="35" y="24" width="7" height="24" rx="3.5" fill={hColor} /><rect x="78" y="24" width="7" height="24" rx="3.5" fill={hColor} /></>,
-    hs7: <ellipse cx="60" cy="18" rx="28" ry="17" fill={hColor} />,
-    hs8: <rect x="38" y="14" width="44" height="8" rx="4" fill={hColor} />,
+    // Curto com franja
+    hs1: (
+      <>
+        <rect x="36" y="12" width="48" height="16" rx="8" fill={hColor} />
+        <rect x="36" y="20" width="48" height="8" rx="0" fill={hColor} />
+        <rect x="32" y="22" width="12" height="12" rx="4" fill={hColor} />
+        <rect x="76" y="22" width="12" height="12" rx="4" fill={hColor} />
+        <rect x="36" y="26" width="22" height="8" rx="4" fill={hColor} opacity="0.7" />
+      </>
+    ),
+    // Bob longo com volume
+    hs2: (
+      <>
+        <rect x="32" y="10" width="56" height="20" rx="10" fill={hColor} />
+        <rect x="30" y="22" width="10" height="24" rx="5" fill={hColor} />
+        <rect x="80" y="22" width="10" height="24" rx="5" fill={hColor} />
+        <rect x="32" y="28" width="56" height="10" rx="5" fill={hColor} opacity="0.6"/>
+      </>
+    ),
+    // Longo liso até o ombro
+    hs3: (
+      <>
+        <rect x="31" y="10" width="58" height="20" rx="10" fill={hColor} />
+        <rect x="28" y="22" width="12" height="38" rx="6" fill={hColor} />
+        <rect x="80" y="22" width="12" height="38" rx="6" fill={hColor} />
+        <rect x="38" y="26" width="44" height="6" rx="3" fill={hColor} opacity="0.5"/>
+      </>
+    ),
+    // Cacheado volumoso
+    hs4: (
+      <>
+        <ellipse cx="60" cy="18" rx="30" ry="14" fill={hColor} />
+        <circle cx="36" cy="28" r="8" fill={hColor} />
+        <circle cx="84" cy="28" r="8" fill={hColor} />
+        <circle cx="40" cy="38" r="6" fill={hColor} />
+        <circle cx="80" cy="38" r="6" fill={hColor} />
+        <circle cx="52" cy="42" r="5" fill={hColor} />
+        <circle cx="68" cy="42" r="5" fill={hColor} />
+        <ellipse cx="60" cy="16" rx="22" ry="10" fill={hColor} opacity="0.6"/>
+      </>
+    ),
+    // Rabo de cavalo alto
+    hs5: (
+      <>
+        <rect x="34" y="12" width="52" height="16" rx="8" fill={hColor} />
+        <ellipse cx="60" cy="14" rx="18" ry="8" fill={hColor} />
+        <rect x="56" y="10" width="8" height="30" rx="4" fill={hColor} />
+        <ellipse cx="60" cy="40" rx="7" ry="4" fill={hColor} opacity="0.8"/>
+        <rect x="55" y="40" width="10" height="20" rx="5" fill={hColor} opacity="0.7"/>
+      </>
+    ),
+    // Tranças (duas)
+    hs6: (
+      <>
+        <rect x="33" y="12" width="54" height="16" rx="8" fill={hColor} />
+        <rect x="33" y="24" width="9" height="32" rx="4" fill={hColor} />
+        <rect x="78" y="24" width="9" height="32" rx="4" fill={hColor} />
+        <rect x="35" y="30" width="5" height="4" rx="2" fill="rgba(255,255,255,0.2)" />
+        <rect x="35" y="38" width="5" height="4" rx="2" fill="rgba(255,255,255,0.2)" />
+        <rect x="80" y="30" width="5" height="4" rx="2" fill="rgba(255,255,255,0.2)" />
+        <rect x="80" y="38" width="5" height="4" rx="2" fill="rgba(255,255,255,0.2)" />
+      </>
+    ),
+    // Afro grande e redondo
+    hs7: (
+      <>
+        <ellipse cx="60" cy="16" rx="32" ry="18" fill={hColor} />
+        <ellipse cx="60" cy="22" rx="26" ry="12" fill={hColor} opacity="0.4"/>
+        <circle cx="38" cy="26" r="10" fill={hColor} />
+        <circle cx="82" cy="26" r="10" fill={hColor} />
+      </>
+    ),
+    // Corte joãozinho (bem curto, pixie)
+    hs8: (
+      <>
+        <rect x="36" y="14" width="48" height="12" rx="6" fill={hColor} />
+        <rect x="32" y="20" width="10" height="10" rx="4" fill={hColor} />
+        <rect x="78" y="20" width="10" height="10" rx="4" fill={hColor} />
+        <rect x="36" y="22" width="20" height="6" rx="3" fill={hColor} opacity="0.7"/>
+      </>
+    ),
   };
 
   return (

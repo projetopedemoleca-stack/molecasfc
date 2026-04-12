@@ -90,7 +90,7 @@ export default function BobinhoGame() {
     setBobinhos(newBobinhos);
     setBallHolder(0);
     setBallPos({ x: newPlayers[0].x, y: newPlayers[0].y });
-    setSelectedPlayer(role === 'player' ? 0 : null);
+    setSelectedPlayer(0); // sempre controla o índice 0 (jogador ou bobinho)
     setPasses(0);
     setTimeLeft(config.time);
   }, [config, role]);
@@ -126,6 +126,19 @@ export default function BobinhoGame() {
         });
       }
 
+      // Mover bobinho selecionado (quando role é bobinho)
+      if (role === 'bobinho' && joystick.active) {
+        setBobinhos(prev => {
+          const updated = [...prev];
+          const b = { ...updated[0] };
+          const speed = 3;
+          b.x = clamp(b.x + joystick.x * speed, BOBINHO_R, FIELD_W - BOBINHO_R);
+          b.y = clamp(b.y + joystick.y * speed, BOBINHO_R, FIELD_H - BOBINHO_R);
+          updated[0] = b;
+          return updated;
+        });
+      }
+
       // IA dos outros jogadores (se você é um jogador)
       if (role === 'player') {
         setPlayers(prev => {
@@ -152,7 +165,9 @@ export default function BobinhoGame() {
 
       // IA do bobinho
       setBobinhos(prev => {
-        return prev.map(b => {
+        return prev.map((b, idx) => {
+          // Quando role é bobinho, o índice 0 é controlado pelo jogador (joystick)
+          if (role === 'bobinho' && idx === 0) return b;
           const target = players[ballHolder];
           const dx = target.x - b.x;
           const dy = target.y - b.y;
@@ -201,7 +216,8 @@ export default function BobinhoGame() {
   // Auto-passe inteligente dos bots
   useEffect(() => {
     if (phase !== 'playing') return;
-    if (ballHolder === selectedPlayer && role === 'player') return; // jogador controla manualmente
+    // O jogador humano passa manualmente; bots passam automaticamente
+    if (role === 'player' && ballHolder === selectedPlayer) return;
 
     // Bot com a bola: passar para o jogador mais seguro após 1.5s
     const t = setTimeout(() => {
@@ -248,7 +264,7 @@ export default function BobinhoGame() {
 
   // Joystick handlers
   const handleJoyStart = (clientX, clientY) => {
-    if (!joyRef.current || role !== 'player') return;
+    if (!joyRef.current) return;
     const rect = joyRef.current.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
@@ -524,7 +540,7 @@ export default function BobinhoGame() {
 
       {/* Controles */}
       <div className="flex items-center gap-4 w-full max-w-sm">
-        {role === 'player' ? (
+        {(role === 'player' || role === 'bobinho') ? (
           <>
             <div
               ref={joyRef}
@@ -538,7 +554,7 @@ export default function BobinhoGame() {
               onMouseLeave={handleJoyEnd}
             >
               <motion.div
-                className="absolute w-10 h-10 rounded-full bg-gradient-to-br from-primary to-green-600 shadow-lg border-2 border-white"
+                className={`absolute w-10 h-10 rounded-full shadow-lg border-2 border-white ${role === 'bobinho' ? 'bg-gradient-to-br from-red-500 to-red-700' : 'bg-gradient-to-br from-primary to-green-600'}`}
                 style={{ left: '50%', top: '50%' }}
                 animate={{
                   x: joystick.x * 25 - 20,
@@ -549,19 +565,21 @@ export default function BobinhoGame() {
               />
             </div>
             <div className="flex-1 text-center">
-              <p className="text-xs text-gray-500">
-                {ballHolder === selectedPlayer 
-                  ? 'Você tem a bola! Toque nos números para passar' 
-                  : 'Mova-se com o joystick'}
-              </p>
+              {role === 'player' ? (
+                <p className="text-xs text-gray-500">
+                  {ballHolder === selectedPlayer 
+                    ? 'Você tem a bola! Toque nos números para passar' 
+                    : 'Mova-se com o joystick'}
+                </p>
+              ) : (
+                <div>
+                  <p className="text-sm font-bold text-red-500">Você é o Bobinho!</p>
+                  <p className="text-xs text-gray-500">Use o joystick para pegar a bola!</p>
+                </div>
+              )}
             </div>
           </>
-        ) : (
-          <div className="flex-1 text-center">
-            <p className="text-sm font-bold text-red-500">Você é o Bobinho!</p>
-            <p className="text-xs text-gray-500">Pegue quem tem a bola!</p>
-          </div>
-        )}
+        ) : null}
         
         <button
           onClick={() => setSoundEnabled(!soundEnabled)}
@@ -576,6 +594,19 @@ export default function BobinhoGame() {
           <RotateCcw className="w-4 h-4" />
         </button>
       </div>
+
+      {role === 'player' && phase === 'playing' && ballHolder === selectedPlayer && (
+        <div className="flex gap-2 flex-wrap justify-center w-full max-w-sm">
+          {players.map((p, i) => i !== selectedPlayer && (
+            <motion.button key={i} whileTap={{ scale: 0.9 }}
+              onClick={() => passBall(i)}
+              className="px-4 py-2 rounded-xl font-bold text-xs text-white shadow-lg"
+              style={{ background: p.color }}>
+              Passar →{i + 1}
+            </motion.button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

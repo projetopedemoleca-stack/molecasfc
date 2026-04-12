@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const KEY_MENSTRUAL_DIARY = 'molecas_menstrual_diary_v2';
 
@@ -39,6 +39,7 @@ export default function DiarioMenstrual() {
   const [mood, setMood] = useState(null);
   const [notes, setNotes] = useState('');
   const [tab, setTab] = useState('calendar');
+  const [saved, setSaved] = useState(false);
 
   const saveCycles = (newCycles) => {
     localStorage.setItem(KEY_MENSTRUAL_DIARY, JSON.stringify(newCycles));
@@ -46,16 +47,30 @@ export default function DiarioMenstrual() {
   };
 
   const addCycle = () => {
-    const newCycles = [...cycles, { date: selectedDate, symptoms, mood, notes, id: Date.now() }];
+    const existing = cycles.find(c => c.date === selectedDate);
+    let newCycles;
+    if (existing) {
+      // Atualiza a entrada existente
+      newCycles = cycles.map(c =>
+        c.date === selectedDate
+          ? { ...c, symptoms: symptoms.length > 0 ? symptoms : c.symptoms, mood: mood || c.mood, notes: notes || c.notes }
+          : c
+      );
+    } else {
+      newCycles = [...cycles, { date: selectedDate, symptoms, mood, notes, id: Date.now() }];
+    }
+    newCycles.sort((a, b) => new Date(a.date) - new Date(b.date));
     saveCycles(newCycles);
     setSymptoms([]);
     setMood(null);
     setNotes('');
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
   };
 
   const lastCycle = cycles[cycles.length - 1];
-  const cycleDay = lastCycle ? Math.floor((new Date() - new Date(lastCycle.date)) / (1000 * 60 * 60 * 24)) : null;
-  const nextPeriod = lastCycle ? new Date(new Date(lastCycle.date).getTime() + 28 * 24 * 60 * 60 * 1000) : null;
+  const cycleDay = lastCycle ? Math.floor((new Date() - new Date(lastCycle.date + 'T12:00:00')) / (1000 * 60 * 60 * 24)) : null;
+  const nextPeriod = lastCycle ? new Date(new Date(lastCycle.date + 'T12:00:00').getTime() + 28 * 24 * 60 * 60 * 1000) : null;
   const daysUntilNext = nextPeriod ? Math.ceil((nextPeriod - new Date()) / (1000 * 60 * 60 * 24)) : null;
 
   const getCurrentPhase = () => {
@@ -126,7 +141,7 @@ export default function DiarioMenstrual() {
                   <div key={c.id} className="flex items-center justify-between text-sm py-2 px-2 bg-muted/30 rounded-lg border-b border-border/20 last:border-0">
                     <div>
                       <span className="font-semibold">Ciclo {cycles.length - i}</span>
-                      <span className="text-muted-foreground ml-2">{new Date(c.date).toLocaleDateString('pt-BR')}</span>
+                      <span className="text-muted-foreground ml-2">{new Date(c.date + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
                     </div>
                     <button onClick={() => saveCycles(cycles.filter(item => item.id !== c.id))}
                       className="px-2 py-1 text-xs bg-red-500/20 text-red-600 hover:bg-red-500/30 rounded-lg font-bold transition-all">
@@ -174,6 +189,19 @@ export default function DiarioMenstrual() {
           <button onClick={addCycle} className="w-full py-3 bg-rose-500 text-white rounded-xl font-heading font-bold">
             💾 Salvar Registro
           </button>
+
+          <AnimatePresence>
+            {saved && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.9 }}
+                className="w-full py-3 bg-green-100 border-2 border-green-400 text-green-700 rounded-xl font-bold text-center text-sm"
+              >
+                ✅ Registro salvo com sucesso!
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       )}
 

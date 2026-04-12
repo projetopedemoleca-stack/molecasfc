@@ -51,6 +51,7 @@ export default function GolAGolGame() {
   const config = getLevelConfig(level);
   const rafRef = useRef(null);
   const aimRef = useRef(null);
+  const keeperPosRef = useRef({ x: FIELD_W / 2, y: 60 });
 
   const playSound = (sound) => {
     if (soundEnabled) audio.play?.(sound);
@@ -72,6 +73,7 @@ export default function GolAGolGame() {
   const resetPositions = (who) => {
     setBallPos({ x: FIELD_W / 2, y: who === 'player' ? FIELD_H - 100 : 100 });
     setKeeperPos({ x: FIELD_W / 2, y: who === 'player' ? 60 : FIELD_H - 60 });
+    keeperPosRef.current = { x: FIELD_W / 2, y: who === 'player' ? 60 : FIELD_H - 60 };
     setAimAngle(who === 'player' ? -Math.PI / 2 : Math.PI / 2);
     setAimPower(50);
     setBallTrail([]);
@@ -118,18 +120,20 @@ export default function GolAGolGame() {
         const targetX = who === 'player' ? pos.x : FIELD_W / 2;
         const speed = config.keeperSpeed;
         const diff = targetX - prev.x;
-        return {
+        const next = {
           x: clamp(prev.x + Math.sign(diff) * Math.min(Math.abs(diff), speed), GOAL_W / 2, FIELD_W - GOAL_W / 2),
           y: prev.y,
         };
+        keeperPosRef.current = next;
+        return next;
       });
 
       const inGoalY = who === 'player' ? pos.y < GOAL_H + 20 : pos.y > FIELD_H - GOAL_H - 20;
       const inGoalX = Math.abs(pos.x - FIELD_W / 2) < GOAL_W / 2;
 
       if (inGoalY && inGoalX) {
-        const keeperDist = dist(pos, keeperPos);
-        if (keeperDist < PLAYER_R + BALL_R + 15) {
+        const keeperDist = dist(pos, keeperPosRef.current);
+        if (keeperDist < PLAYER_R + BALL_R - 5) {
           setShowSaveEffect(true);
           playSound('save');
           setTimeout(() => {
