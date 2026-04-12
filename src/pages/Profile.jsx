@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Star, ChevronDown, Pencil } from 'lucide-react';
+import { ArrowLeft, Star, ChevronDown, Pencil, Trophy, Lock } from 'lucide-react';
 import { PLAYERS, FAVORITE_TEAMS_BY_REGION } from '@/lib/gameData';
 import { getAbility } from '@/lib/playerAbilities';
 import { loadProfile, saveProfile } from '@/lib/playerProfile';
@@ -9,6 +9,14 @@ import { audio } from '@/lib/audioEngine';
 import PlayerAvatar from '@/components/game/PlayerAvatar';
 
 const REGIONS = Object.entries(FAVORITE_TEAMS_BY_REGION).map(([key, val]) => ({ key, ...val }));
+
+const MEDALS = [
+  { id: 'first_win', name: 'Primeira Vitória', emoji: '🥇', desc: 'Vença sua primeira partida', condition: (s) => (s?.wins || 0) >= 1 },
+  { id: '3_goals', name: 'Artilheira', emoji: '⚽', desc: 'Marque 3 gols em partidas', condition: (s) => (s?.goals || 0) >= 3 },
+  { id: 'streak_3', name: 'Em Chamas', emoji: '🔥', desc: 'Vença 3 partidas seguidas', condition: (s) => (s?.bestStreak || 0) >= 3 },
+  { id: '10_matches', name: 'Veterana', emoji: '🏆', desc: 'Jogue 10 partidas', condition: (s) => (s?.matches || 0) >= 10 },
+  { id: '5_wins', name: 'Campeã', emoji: '👑', desc: 'Vença 5 partidas', condition: (s) => (s?.wins || 0) >= 5 },
+];
 
 const statLabels = [
   { key: 'tecnica',      emoji: '🎯', label: 'Técnica' },
@@ -245,6 +253,49 @@ export default function Profile() {
               </AnimatePresence>
             </div>
           ))}
+        </div>
+      </motion.div>
+
+      {/* ── Conquistas ── */}
+      <motion.div
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.2 }}
+        className="max-w-sm mx-auto mb-5"
+      >
+        <div className="flex items-center gap-2 mb-3">
+          <Trophy className="w-5 h-5 text-yellow-500" />
+          <h2 className="font-heading font-bold text-lg">Conquistas</h2>
+          <span className="ml-auto text-xs text-muted-foreground">
+            {MEDALS.filter(m => m.condition(profile.stats)).length}/{MEDALS.length}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          {MEDALS.map((medal, idx) => {
+            const unlocked = medal.condition(profile.stats);
+            return (
+              <motion.div
+                key={medal.id}
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.3 + idx * 0.05 }}
+                className={`relative rounded-2xl p-3 text-center border-2 transition-all ${
+                  unlocked 
+                    ? 'bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-300' 
+                    : 'bg-muted/30 border-muted grayscale'
+                }`}
+              >
+                <div className="text-3xl mb-1">{medal.emoji}</div>
+                <div className="text-[10px] font-bold leading-tight">{medal.name}</div>
+                {!unlocked && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-background/60 rounded-2xl">
+                    <Lock className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                )}
+              </motion.div>
+            );
+          })}
         </div>
       </motion.div>
     </div>

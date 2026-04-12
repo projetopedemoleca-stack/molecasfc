@@ -15,6 +15,8 @@ import Achievements from '@/pages/Achievements';
 import CharacterSelect from '@/pages/CharacterSelect';
 import Profile from '@/pages/Profile';
 import Training from '@/pages/Training';
+import English from '@/pages/English';
+import Saude from '@/pages/Saude';
 import About from '@/pages/About';
 
 const AuthenticatedApp = () => {
@@ -53,7 +55,8 @@ const AuthenticatedApp = () => {
       <Route path="/character-select" element={<CharacterSelect />} />
       <Route path="/profile" element={<Profile />} />
       <Route path="/training" element={<Training />} />
-
+      <Route path="/english" element={<English />} />
+      <Route path="/saude" element={<Saude />} />
       <Route path="/about" element={<About />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
