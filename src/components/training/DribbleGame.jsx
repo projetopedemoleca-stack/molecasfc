@@ -745,7 +745,7 @@ export default function DribbleGame() {
           </div>
         </div>
 
-        {ballOwner === 'player' && playerPos.y < 180 && phase === 'playing' && (
+        {ballOwner === 'player' && playerPos.y < FIELD_H / 2 && phase === 'playing' && (
           <motion.button
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}

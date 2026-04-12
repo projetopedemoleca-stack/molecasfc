@@ -1,185 +1,212 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// GolAGolGame — Jogador vs Bot, chutes e defesas alternadas
+// Controles: joystick para mirar, barra para defender
+// ═══════════════════════════════════════════════════════════════════════════
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, RotateCcw, Volume2, VolumeX, Target, Shield } from 'lucide-react';
+import { Volume2, VolumeX } from 'lucide-react';
 import { audio } from '@/lib/audioEngine';
 
-// ═══════════════════════════════════════════════════════════════════════════
-// GOL A GOL - 1v1 Alternado (Melhorado)
-// Estilo: Jogador vs Bot, alternam chutes e defesas
-// Controles melhorados: joystick para mirar + botão de chute
-// ═══════════════════════════════════════════════════════════════════════════
-
-const FIELD_W = 360;
-const FIELD_H = 480;
-const GOAL_W  = 220; // gol maior
-const GOAL_H  = 100;
+const FIELD_W  = 360;
+const FIELD_H  = 520;
+const GOAL_W   = 220;
+const GOAL_H   = 80;
 const PLAYER_R = 28;
 const BALL_R   = 12;
 
-// Progressão automática de nível
+function clamp(v, mn, mx) { return Math.max(mn, Math.min(mx, v)); }
+function dist(a, b) { return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2); }
+
+// Progressão automática
 function getLevelConfig(lvl) {
   return {
     label: `Nível ${lvl + 1}`,
     rounds: 3 + Math.floor(lvl / 2),
-    keeperSpeed: 1.2 + lvl * 0.5,
-    botAccuracy: 0.2 + lvl * 0.08,
+    keeperSpeed: 1.0 + lvl * 0.55,
+    botAccuracy: Math.min(0.15 + lvl * 0.08, 0.85),
   };
 }
-const MAX_LEVEL = 8;
+const MAX_LEVEL = 9;
 
-function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
-function dist(a, b) { return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2); }
-
-export default function GolAGolGame() {
-  const [phase, setPhase] = useState('starting');
-  const [level, setLevel] = useState(0);
-  const [score, setScore] = useState({ player: 0, bot: 0 });
-  const [round, setRound] = useState(1);
-  const [turn, setTurn] = useState('player');
+export default function GolAGolGame({ onStickerEarned }) {
+  const [level, setLevel]           = useState(0);
+  const [round, setRound]           = useState(1);
+  const [turn, setTurn]             = useState('player');
+  const [phase, setPhase]           = useState('idle'); // idle | playing | shooting | goal | save | result | victory
+  const [score, setScore]           = useState({ player: 0, bot: 0 });
+  const [aimAngle, setAimAngle]     = useState(-Math.PI / 2);
+  const [aimPower, setAimPower]     = useState(55);
+  const [ballPos, setBallPos]       = useState({ x: FIELD_W / 2, y: FIELD_H - 90 });
+  const [ballTrail, setBallTrail]   = useState([]);
+  const [keeperPos, setKeeperPos]   = useState({ x: FIELD_W / 2, y: 60 });
+  const [playerPos, setPlayerPos]   = useState({ x: FIELD_W / 2, y: FIELD_H - 90 });
+  const [joystick, setJoystick]     = useState({ x: 0, y: 0 });
+  const [showGoal, setShowGoal]     = useState(false);
+  const [showSave, setShowSave]     = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
 
-  const [ballPos, setBallPos] = useState({ x: FIELD_W / 2, y: FIELD_H - 100 });
-  const [keeperPos, setKeeperPos] = useState({ x: FIELD_W / 2, y: 60 });
-  const [aimAngle, setAimAngle] = useState(-Math.PI / 2); // Mirando para cima
-  const [aimPower, setAimPower] = useState(50); // 0-100
-  const [isAiming, setIsAiming] = useState(false);
-  const [showGoalEffect, setShowGoalEffect] = useState(false);
-  const [showSaveEffect, setShowSaveEffect] = useState(false);
-  const [ballTrail, setBallTrail] = useState([]);
-  const [defenderTouch, setDefenderTouch] = useState({ x: null, y: null });
+  const keeperRef  = useRef({ x: FIELD_W / 2, y: 60 });
+  const rafRef     = useRef(null);
+  const joyRef     = useRef(null);
+  const joyCtrRef  = useRef(null);
+  const defending  = useRef(false);
+  const defBarRef  = useRef(null);
 
   const config = getLevelConfig(level);
-  const rafRef = useRef(null);
-  const aimRef = useRef(null);
-  const keeperPosRef = useRef({ x: FIELD_W / 2, y: 60 });
 
-  const playSound = (sound) => {
-    if (soundEnabled) audio.play?.(sound);
-  };
+  const playSound = useCallback((name) => {
+    if (!soundEnabled) return;
+    try { audio[name]?.(); } catch {}
+  }, [soundEnabled]);
 
+  // ── Resetar posições ──────────────────────────────────────────────────────
+  const resetPos = useCallback((t, lvl) => {
+    if (t === 'player') {
+      // Jogador chuta: bola em baixo, goleira em cima
+      setBallPos({ x: FIELD_W / 2, y: FIELD_H - 90 });
+      setPlayerPos({ x: FIELD_W / 2, y: FIELD_H - 90 });
+      const kp = { x: FIELD_W / 2, y: GOAL_H - 10 };
+      setKeeperPos(kp);
+      keeperRef.current = kp;
+    } else {
+      // Bot chuta: bola em cima, goleira em baixo
+      setBallPos({ x: FIELD_W / 2, y: 90 });
+      setPlayerPos({ x: FIELD_W / 2, y: FIELD_H - GOAL_H + 10 });
+      const kp = { x: FIELD_W / 2, y: FIELD_H - GOAL_H + 10 };
+      setKeeperPos(kp);
+      keeperRef.current = kp;
+    }
+    setBallTrail([]);
+    setAimAngle(t === 'player' ? -Math.PI / 2 : Math.PI / 2);
+    setAimPower(55);
+  }, []);
+
+  // ── Iniciar nível ─────────────────────────────────────────────────────────
   const initLevel = useCallback((lvl = 0) => {
     setLevel(lvl);
     setScore({ player: 0, bot: 0 });
     setRound(1);
     setTurn('player');
-    resetPositions('player');
+    resetPos('player', lvl);
     setPhase('playing');
-    setAimAngle(-Math.PI / 2);
-    setAimPower(50);
-  }, []);
+  }, [resetPos]);
 
   useEffect(() => { initLevel(0); }, []);
 
-  const resetPositions = (who) => {
-    setBallPos({ x: FIELD_W / 2, y: who === 'player' ? FIELD_H - 100 : 100 });
-    setKeeperPos({ x: FIELD_W / 2, y: who === 'player' ? 60 : FIELD_H - 60 });
-    keeperPosRef.current = { x: FIELD_W / 2, y: who === 'player' ? 60 : FIELD_H - 60 };
-    setAimAngle(who === 'player' ? -Math.PI / 2 : Math.PI / 2);
-    setAimPower(50);
-    setBallTrail([]);
-    setDefenderTouch({ x: null, y: null });
+  // ── Joystick de mira ──────────────────────────────────────────────────────
+  const handleJoyStart = (cx, cy) => {
+    if (!joyRef.current) return;
+    const rect = joyRef.current.getBoundingClientRect();
+    const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    joyCtrRef.current = center;
+    updateJoy(cx, cy, center);
   };
-
-  // Bot joga
-  useEffect(() => {
-    if (phase !== 'playing' || turn !== 'bot') return;
-
-    const timeout = setTimeout(() => {
-      const targetX = 50 + Math.random() * (FIELD_W - 100);
-      const targetY = FIELD_H - 80;
-      const dx = targetX - ballPos.x;
-      const dy = targetY - ballPos.y;
-      const power = 8 + Math.random() * 4;
-      shootBall(dx, dy, power, 'bot');
-    }, 1000 + Math.random() * 1000);
-
-    return () => clearTimeout(timeout);
-  }, [phase, turn, ballPos]);
-
-  const shootBall = (dx, dy, power, who) => {
-    setPhase('shooting');
-    playSound('kick');
-
+  const updateJoy = (cx, cy, center) => {
+    const c = center || joyCtrRef.current;
+    if (!c) return;
+    const dx = cx - c.x, dy = cy - c.y;
+    const mag = Math.sqrt(dx * dx + dy * dy) || 1;
+    const scale = Math.min(mag, 40) / 40;
     const angle = Math.atan2(dy, dx);
-    const vx = Math.cos(angle) * power;
-    const vy = Math.sin(angle) * power;
+    setJoystick({ x: Math.cos(angle) * scale, y: Math.sin(angle) * scale });
+    setAimAngle(angle);
+    setAimPower(40 + scale * 30);
+  };
+  const handleJoyEnd = () => { joyCtrRef.current = null; };
 
-    let pos = { ...ballPos };
-    let trail = [pos];
+  // ── Controle da goleira (barra de defesa) ─────────────────────────────────
+  const handleDefend = useCallback((clientX) => {
+    if (!defBarRef.current) return;
+    const rect = defBarRef.current.getBoundingClientRect();
+    const pct = (clientX - rect.left) / rect.width;
+    const newX = clamp(GOAL_W / 2 + pct * (FIELD_W - GOAL_W), GOAL_W / 2, FIELD_W - GOAL_W / 2);
+    const kp = { x: newX, y: keeperRef.current.y };
+    keeperRef.current = kp;
+    setKeeperPos(kp);
+  }, []);
+
+  // ── Chutar ────────────────────────────────────────────────────────────────
+  const shoot = useCallback((who) => {
+    if (phase === 'shooting') return;
+    setPhase('shooting');
+
+    const speed = aimPower / 5;
+    let vx = Math.cos(aimAngle) * speed;
+    let vy = Math.sin(aimAngle) * speed;
+    let pos = { ...(who === 'player' ? ballPos : { x: FIELD_W / 2, y: 90 }) };
+    const trail = [];
     let frame = 0;
+    let finished = false;
 
     const animate = () => {
+      if (finished) return;
       frame++;
       pos = { x: pos.x + vx, y: pos.y + vy };
-
       if (frame % 2 === 0) trail.push({ ...pos });
-      setBallTrail([...trail]);
+      setBallTrail([...trail.slice(-8)]);
 
-      // Goleira se move — calculado SINCRONAMENTE para checagem correta
+      // Mover goleira sincronamente
       {
+        const prev = keeperRef.current;
         const targetX = who === 'player' ? pos.x : FIELD_W / 2;
-        const speed = config.keeperSpeed;
-        const prev = keeperPosRef.current;
         const diff = targetX - prev.x;
         const next = {
-          x: clamp(prev.x + Math.sign(diff) * Math.min(Math.abs(diff), speed), GOAL_W / 2, FIELD_W - GOAL_W / 2),
+          x: clamp(prev.x + Math.sign(diff) * Math.min(Math.abs(diff), config.keeperSpeed), GOAL_W / 2, FIELD_W - GOAL_W / 2),
           y: prev.y,
         };
-        keeperPosRef.current = next;
+        keeperRef.current = next;
         setKeeperPos(next);
       }
 
-      const inGoalY = who === 'player' ? pos.y < GOAL_H + 20 : pos.y > FIELD_H - GOAL_H - 20;
+      // Verificar gol
+      const inGoalY = who === 'player' ? pos.y < GOAL_H + 10 : pos.y > FIELD_H - GOAL_H - 10;
       const inGoalX = Math.abs(pos.x - FIELD_W / 2) < GOAL_W / 2;
 
       if (inGoalY && inGoalX) {
-        const keeperDist = dist(pos, keeperPosRef.current);
-        if (keeperDist < PLAYER_R + BALL_R - 5) {
-          setShowSaveEffect(true);
+        finished = true;
+        const kDist = dist(pos, keeperRef.current);
+        if (kDist < PLAYER_R + BALL_R + 2) {
+          // Defendido
+          setShowSave(true);
           playSound('save');
-          setTimeout(() => {
-            setShowSaveEffect(false);
-            nextTurn();
-          }, 1500);
-          return;
-        }
+          setTimeout(() => { setShowSave(false); nextTurn(who); }, 1400);
+        } else {
+          // GOL!
+          setShowGoal(true);
+          playSound('goal');
+          setScore(prev => {
+            const next = { ...prev };
+            if (who === 'player') next.player++;
+            else next.bot++;
 
-        setShowGoalEffect(true);
-        playSound('goal');
-
-        const newScore = { ...score };
-        if (who === 'player') newScore.player++;
-        else newScore.bot++;
-        setScore(newScore);
-
-        setTimeout(() => {
-          setShowGoalEffect(false);
-
-          if (newScore.player >= Math.ceil(config.rounds / 2) ||
-              newScore.bot >= Math.ceil(config.rounds / 2) ||
-              round >= config.rounds) {
-            if (newScore.player > newScore.bot) {
-              const nextLvl = level + 1;
-              if (nextLvl >= MAX_LEVEL) {
-                setPhase('victory');
-                playSound('victory');
+            setTimeout(() => {
+              setShowGoal(false);
+              const cfg = getLevelConfig(level);
+              const roundsToWin = Math.ceil(cfg.rounds / 2);
+              if (next.player >= roundsToWin || next.bot >= roundsToWin || round >= cfg.rounds) {
+                if (next.player > next.bot) {
+                  const nextLvl = level + 1;
+                  if (nextLvl >= MAX_LEVEL) { setPhase('victory'); playSound('victory'); }
+                  else { initLevel(nextLvl); }
+                } else {
+                  setPhase('result'); playSound('gameover');
+                }
               } else {
-                initLevel(nextLvl);
+                setRound(r => r + 1);
+                nextTurn(who);
               }
-            } else {
-              setPhase('result');
-              playSound('gameover');
-            }
-          } else {
-            setRound(r => r + 1);
-            nextTurn();
-          }
-        }, 1500);
+            }, 1500);
+            return next;
+          });
+        }
+        setBallPos(pos);
         return;
       }
 
-      if (pos.y < 0 || pos.y > FIELD_H || pos.x < 0 || pos.x > FIELD_W) {
-        setTimeout(() => nextTurn(), 500);
+      // Saiu pela lateral
+      if (pos.y < -30 || pos.y > FIELD_H + 30 || pos.x < -20 || pos.x > FIELD_W + 20) {
+        finished = true;
+        setTimeout(() => nextTurn(who), 600);
         return;
       }
 
@@ -188,265 +215,196 @@ export default function GolAGolGame() {
     };
 
     rafRef.current = requestAnimationFrame(animate);
-  };
+  }, [phase, aimAngle, aimPower, ballPos, config, level, round, playSound, initLevel]);
 
-  const nextTurn = () => {
-    const next = turn === 'player' ? 'bot' : 'player';
+  // ── Próxima vez (vez do bot ou do jogador) ────────────────────────────────
+  const nextTurn = useCallback((lastWho) => {
+    const next = lastWho === 'player' ? 'bot' : 'player';
     setTurn(next);
-    resetPositions(next);
-    setPhase('playing');
-  };
+    resetPos(next);
+    if (next === 'bot') {
+      // Bot chuta automaticamente após 1s
+      setTimeout(() => {
+        const cfg = getLevelConfig(level);
+        const misses = Math.random() > cfg.botAccuracy;
+        const randomOffset = misses ? (Math.random() - 0.5) * GOAL_W : (Math.random() - 0.5) * (GOAL_W * 0.4);
+        const targetX = FIELD_W / 2 + randomOffset;
+        const dy = FIELD_H - 10;
+        const dx = targetX - FIELD_W / 2;
+        const angle = Math.atan2(dy, dx);
+        setAimAngle(angle);
+        setAimPower(60);
+        setTimeout(() => shoot('bot'), 400);
+      }, 1000);
+    } else {
+      setPhase('playing');
+    }
+  }, [level, resetPos, shoot]);
 
-  // Controles de mira com joystick
-  const handleAimStart = (clientX, clientY) => {
-    if (phase !== 'playing' || turn !== 'player') return;
-    setIsAiming(true);
-    updateAim(clientX, clientY);
-  };
-
-  const handleAimMove = (clientX, clientY) => {
-    if (!isAiming || phase !== 'playing' || turn !== 'player') return;
-    updateAim(clientX, clientY);
-  };
-
-  const updateAim = (clientX, clientY) => {
-    if (!aimRef.current) return;
-    const rect = aimRef.current.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    
-    const dx = clientX - centerX;
-    const dy = clientY - centerY;
-    const angle = Math.atan2(dy, dx);
-    const distance = Math.min(Math.sqrt(dx * dx + dy * dy), 50);
-    const power = (distance / 50) * 100;
-    
-    setAimAngle(angle);
-    setAimPower(power);
-  };
-
-  const handleAimEnd = () => {
-    setIsAiming(false);
-  };
-
-  const doShoot = () => {
-    if (phase !== 'playing' || turn !== 'player') return;
-    const power = 6 + (aimPower / 100) * 8; // 6-14
-    shootBall(Math.cos(aimAngle) * power, Math.sin(aimAngle) * power, power, 'player');
-  };
-
-  // Defesa - mover goleiro
-  const handleDefendMove = (clientX) => {
-    if (phase !== 'shooting' || turn !== 'bot') return;
-    const rect = document.getElementById('game-field')?.getBoundingClientRect();
-    if (!rect) return;
-    const x = clientX - rect.left;
-    setKeeperPos(prev => ({
-      ...prev,
-      x: clamp(x, GOAL_W / 2, FIELD_W - GOAL_W / 2),
-    }));
-  };
-
-  // Touch handlers para defesa
-  const handleTouchDefend = (e) => {
-    const t = e.touches[0];
-    handleDefendMove(t.clientX);
-  };
-
-  if (phase === 'starting') {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[80vh] gap-5 px-4">
-        <motion.div animate={{ rotate: 360 }} transition={{ duration: 1 }} className="text-6xl">⚽</motion.div>
-        <p className="text-gray-500 text-sm">Carregando...</p>
-      </div>
-    );
-  }
-
+  // ── UI: Resultado/Vitória ─────────────────────────────────────────────────
   if (phase === 'result' || phase === 'victory') {
+    const won = phase === 'victory' || score.player > score.bot;
     return (
-      <div className="flex flex-col items-center justify-center min-h-[80vh] gap-6 px-4">
-        <motion.div initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }} className="text-center">
-          <div className="text-7xl mb-4">{phase === 'victory' ? '🏆' : score.player > score.bot ? '🥈' : '😢'}</div>
-          <h2 className="font-heading font-black text-3xl text-primary mb-2">{phase === 'victory' ? 'Campeão!' : score.player > score.bot ? 'Vitória!' : 'Derrota'}</h2>
-          <div className="text-4xl font-bold text-gray-700">{score.player} x {score.bot}</div>
-        </motion.div>
-        <div className="flex gap-3 w-full max-w-xs">
-          <motion.button whileTap={{ scale: 0.95 }} onClick={() => initLevel(0)} className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl">Recomeçar</motion.button>
-          <motion.button whileTap={{ scale: 0.95 }} onClick={() => initLevel(0)} className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold rounded-xl shadow-lg">Novamente</motion.button>
+      <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+        className="flex flex-col items-center justify-center min-h-[70vh] gap-5 px-4">
+        <motion.div animate={{ rotate: won ? [0, 10, -10, 0] : 0 }} transition={{ repeat: Infinity, duration: 1 }}
+          className="text-7xl">{won ? '🏆' : '😢'}</motion.div>
+        <div className="text-center">
+          <h2 className="font-heading font-black text-2xl mb-1">{won ? 'Você venceu!' : 'Boa tentativa!'}</h2>
+          <p className="text-muted-foreground">Você {score.player} × {score.bot} Bot</p>
+          {won && <p className="text-primary font-bold mt-1">Nível {level + 1} concluído!</p>}
         </div>
-      </div>
+        <div className="flex gap-3">
+          <button onClick={() => initLevel(0)} className="px-6 py-3 bg-primary text-white font-bold rounded-2xl">Jogar de novo</button>
+        </div>
+      </motion.div>
     );
   }
+
+  // ── UI: Jogo ──────────────────────────────────────────────────────────────
+  const aimX = FIELD_W / 2 + Math.cos(aimAngle) * 50;
+  const aimY = FIELD_H - 90 + Math.sin(aimAngle) * 50;
 
   return (
-    <div className="flex flex-col items-center gap-3 p-2">
-      {/* Placar */}
+    <div className="flex flex-col items-center gap-3 select-none">
+      {/* HUD */}
       <div className="flex items-center justify-between w-full max-w-sm px-2">
         <div className="text-center">
-          <div className="text-xs text-gray-500">Você</div>
-          <motion.div key={score.player} initial={{ scale: 1.5 }} animate={{ scale: 1 }} className="text-3xl font-black text-primary">{score.player}</motion.div>
+          <div className="text-xs text-muted-foreground">{turn === 'player' ? 'Sua vez' : 'Vez do bot'}</div>
+          <div className="font-heading font-black text-2xl">{score.player} × {score.bot}</div>
         </div>
-        <div className="text-center">
-          <div className="text-xs text-gray-500">{config.label}</div>
-          <div className="text-sm font-bold">Rodada {round}/{config.rounds}</div>
-          <div className={`text-xs font-bold ${turn === 'player' ? 'text-primary' : 'text-red-500'}`}>{turn === 'player' ? '⚽ Sua vez!' : '🧤 Defenda!'}</div>
+        <div className="bg-primary/10 border border-primary/30 rounded-xl px-3 py-1 text-xs font-bold text-primary">
+          {config.label} • Round {round}/{config.rounds}
         </div>
-        <div className="text-center">
-          <div className="text-xs text-gray-500">Bot</div>
-          <motion.div key={score.bot} initial={{ scale: 1.5 }} animate={{ scale: 1 }} className="text-3xl font-black text-red-500">{score.bot}</motion.div>
-        </div>
+        <button onClick={() => setSoundEnabled(s => !s)} className="p-2 rounded-full bg-muted">
+          {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+        </button>
       </div>
 
-      {/* Campo */}
-      <div id="game-field" className="relative rounded-2xl overflow-hidden shadow-2xl" style={{ width: FIELD_W, height: FIELD_H, background: 'linear-gradient(180deg, #2d2d2d 0%, #3d3d3d 50%, #2d2d2d 100%)' }} onTouchMove={handleTouchDefend} onMouseMove={(e) => turn === 'bot' && handleDefendMove(e.clientX)}>
+      {/* Campo SVG */}
+      <div className="relative rounded-2xl overflow-hidden shadow-2xl"
+        style={{ width: FIELD_W, height: FIELD_H, background: 'linear-gradient(180deg, #2d5a27 0%, #3a7a33 50%, #2d5a27 100%)' }}>
+
+        {/* SVG do campo */}
+        <svg width={FIELD_W} height={FIELD_H} className="absolute inset-0">
+          {/* Linha central */}
+          <line x1="0" y1={FIELD_H / 2} x2={FIELD_W} y2={FIELD_H / 2} stroke="white" strokeWidth="1.5" opacity="0.3" />
+          <circle cx={FIELD_W / 2} cy={FIELD_H / 2} r="40" stroke="white" strokeWidth="1.5" fill="none" opacity="0.3" />
+
+          {/* Gol de cima (adversário) */}
+          <rect x={(FIELD_W - GOAL_W) / 2} y="0" width={GOAL_W} height={GOAL_H}
+            fill="rgba(255,255,255,0.08)" stroke="white" strokeWidth="3" rx="4" />
+          {/* Rede do gol de cima */}
+          {Array.from({ length: 8 }, (_, i) => (
+            <line key={`vt${i}`} x1={(FIELD_W - GOAL_W) / 2 + (i + 1) * (GOAL_W / 9)} y1="0"
+              x2={(FIELD_W - GOAL_W) / 2 + (i + 1) * (GOAL_W / 9)} y2={GOAL_H}
+              stroke="white" strokeWidth="0.5" opacity="0.3" />
+          ))}
+          {Array.from({ length: 3 }, (_, i) => (
+            <line key={`ht${i}`} x1={(FIELD_W - GOAL_W) / 2} y1={(i + 1) * (GOAL_H / 4)}
+              x2={(FIELD_W - GOAL_W) / 2 + GOAL_W} y2={(i + 1) * (GOAL_H / 4)}
+              stroke="white" strokeWidth="0.5" opacity="0.3" />
+          ))}
+
+          {/* Gol de baixo (jogador) */}
+          <rect x={(FIELD_W - GOAL_W) / 2} y={FIELD_H - GOAL_H} width={GOAL_W} height={GOAL_H}
+            fill="rgba(255,255,255,0.08)" stroke="white" strokeWidth="3" rx="4" />
+          {Array.from({ length: 8 }, (_, i) => (
+            <line key={`vb${i}`} x1={(FIELD_W - GOAL_W) / 2 + (i + 1) * (GOAL_W / 9)} y1={FIELD_H - GOAL_H}
+              x2={(FIELD_W - GOAL_W) / 2 + (i + 1) * (GOAL_W / 9)} y2={FIELD_H}
+              stroke="white" strokeWidth="0.5" opacity="0.3" />
+          ))}
+
+          {/* Linha de mira */}
+          {turn === 'player' && phase === 'playing' && (
+            <line x1={FIELD_W / 2} y1={FIELD_H - 90} x2={aimX} y2={aimY}
+              stroke="#FFD600" strokeWidth="2" strokeDasharray="6 4" opacity="0.8" />
+          )}
+
+          {/* Trail da bola */}
+          {ballTrail.map((t, i) => (
+            <circle key={i} cx={t.x} cy={t.y} r={BALL_R * (i / ballTrail.length) * 0.7}
+              fill="white" opacity={i / ballTrail.length * 0.4} />
+          ))}
+
+          {/* Goleira */}
+          <text x={keeperPos.x} y={keeperPos.y + 6} textAnchor="middle" fontSize="28">👩</text>
+
+          {/* Bola */}
+          <circle cx={ballPos.x} cy={ballPos.y} r={BALL_R} fill="white" />
+          <circle cx={ballPos.x - 3} cy={ballPos.y - 3} r={BALL_R * 0.45} fill="#333" opacity="0.5" />
+
+          {/* Jogador */}
+          <text x={playerPos.x} y={playerPos.y + 8} textAnchor="middle" fontSize="28">⚽</text>
+        </svg>
+
+        {/* Efeitos */}
         <AnimatePresence>
-          {showGoalEffect && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-green-500/50 z-50 flex items-center justify-center">
-              <motion.div initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }} className="text-6xl font-black text-white drop-shadow-lg">GOOOOL! ⚽</motion.div>
+          {showGoal && (
+            <motion.div initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 flex items-center justify-center bg-black/40">
+              <motion.div animate={{ rotate: [0, 5, -5, 0], scale: [1, 1.1, 1] }} transition={{ repeat: Infinity, duration: 0.4 }}
+                className="text-6xl font-black text-white drop-shadow-lg">⚽ GOL!</motion.div>
+            </motion.div>
+          )}
+          {showSave && (
+            <motion.div initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 flex items-center justify-center bg-blue-900/40">
+              <div className="text-4xl font-black text-white drop-shadow-lg">🧤 Defendido!</div>
             </motion.div>
           )}
         </AnimatePresence>
-        <AnimatePresence>
-          {showSaveEffect && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-yellow-500/40 z-50 flex items-center justify-center">
-              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-5xl font-black text-white drop-shadow-lg">DEFENDEU! 🧤</motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Textura de asfalto */}
-        <div className="absolute inset-0 opacity-20">
-          {[...Array(10)].map((_, i) => <div key={i} className="absolute left-0 right-0 h-px bg-gray-400" style={{ top: `${i * 10}%` }} />)}
-          {[0.2, 0.4, 0.6, 0.8].map(p => <div key={p} className="absolute top-0 bottom-0 w-px bg-gray-400" style={{ left: `${p * 100}%` }} />)}
-        </div>
-
-        {/* Gol de cima */}
-        <motion.div className="absolute top-2 left-1/2 transform -translate-x-1/2" style={{ width: GOAL_W, height: GOAL_H, background: 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%)', border: '3px solid rgba(255,255,255,0.5)', borderRadius: '0 0 10px 10px', borderTop: 'none' }}>
-          <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.5, repeat: Infinity }} className="absolute inset-0 flex items-center justify-center text-4xl">🥅</motion.div>
-        </motion.div>
-
-        {/* Gol de baixo */}
-        <motion.div className="absolute bottom-2 left-1/2 transform -translate-x-1/2" style={{ width: GOAL_W, height: GOAL_H, background: 'linear-gradient(0deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%)', border: '3px solid rgba(255,255,255,0.5)', borderRadius: '10px 10px 0 0', borderBottom: 'none' }}>
-          <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.5, repeat: Infinity, delay: 0.5 }} className="absolute inset-0 flex items-center justify-center text-4xl">🥅</motion.div>
-        </motion.div>
-
-        {/* Linha do meio */}
-        <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-white/20" />
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full border-2 border-white/20" />
-
-        {/* Indicador de mira (quando jogador) */}
-        {turn === 'player' && phase === 'playing' && (
-          <div className="absolute pointer-events-none" style={{ left: ballPos.x, top: ballPos.y }}>
-            {/* Linha de mira */}
-            <div className="absolute origin-left" style={{ 
-              width: 80, 
-              height: 3, 
-              background: 'linear-gradient(90deg, rgba(59,130,246,0.8), rgba(59,130,246,0))',
-              transform: `rotate(${aimAngle}rad)`,
-              borderRadius: '2px'
-            }} />
-            {/* Arco de força */}
-            <svg className="absolute" style={{ left: -40, top: -40, width: 80, height: 80, transform: `rotate(${aimAngle}rad)` }}>
-              <circle cx="40" cy="40" r="35" fill="none" stroke="rgba(59,130,246,0.3)" strokeWidth="3" 
-                strokeDasharray={`${aimPower * 2.2} 220`} 
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
-        )}
-
-        {/* Goleira */}
-        <motion.div className="absolute z-10" style={{ left: keeperPos.x - PLAYER_R, top: keeperPos.y - PLAYER_R }} animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 0.5, repeat: Infinity }}>
-          <div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl shadow-lg border-2 border-white" style={{ background: turn === 'player' ? 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)' : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' }}>{turn === 'player' ? '👩' : '👧'}</div>
-        </motion.div>
-
-        {/* Bola */}
-        <motion.div className="absolute z-20" style={{ left: ballPos.x - BALL_R, top: ballPos.y - BALL_R }} animate={{ scale: 1 }}>
-          <div className="w-6 h-6 rounded-full flex items-center justify-center text-sm shadow-lg" style={{ background: 'white', border: '2px solid #e5e7eb' }}>⚽</div>
-        </motion.div>
-
-        {/* Rastro da bola */}
-        {ballTrail.map((pos, i) => <div key={i} className="absolute w-2 h-2 rounded-full bg-white/30" style={{ left: pos.x - 4, top: pos.y - 4, opacity: i / ballTrail.length }} />)}
-
-        {/* Indicadores de lado */}
-        <div className="absolute top-1/2 left-2 transform -translate-y-1/2">
-          <motion.div animate={{ x: [0, 5, 0] }} transition={{ duration: 1, repeat: Infinity }} className={`text-2xl ${turn === 'player' ? 'opacity-100' : 'opacity-30'}`}>▶️</motion.div>
-        </div>
-        <div className="absolute top-1/2 right-2 transform -translate-y-1/2">
-          <motion.div animate={{ x: [0, -5, 0] }} transition={{ duration: 1, repeat: Infinity }} className={`text-2xl ${turn === 'bot' ? 'opacity-100' : 'opacity-30'}`}>◀️</motion.div>
-        </div>
       </div>
 
       {/* Controles */}
-      {turn === 'player' && phase === 'playing' ? (
-        <div className="flex items-center gap-4 w-full max-w-sm">
-          {/* Joystick de mira */}
-          <div
-            ref={aimRef}
-            className="relative w-24 h-24 rounded-full bg-gray-200/60 border-2 border-gray-300 shadow-inner"
-            onTouchStart={(e) => { e.preventDefault(); handleAimStart(e.touches[0].clientX, e.touches[0].clientY); }}
-            onTouchMove={(e) => { e.preventDefault(); handleAimMove(e.touches[0].clientX, e.touches[0].clientY); }}
-            onTouchEnd={(e) => { e.preventDefault(); handleAimEnd(); }}
-            onMouseDown={(e) => handleAimStart(e.clientX, e.clientY)}
-            onMouseMove={(e) => handleAimMove(e.clientX, e.clientY)}
-            onMouseUp={handleAimEnd}
-            onMouseLeave={handleAimEnd}
-          >
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-16 h-16 rounded-full border-2 border-dashed border-gray-400" />
+      {turn === 'player' && phase === 'playing' && (
+        <div className="w-full max-w-sm flex flex-col items-center gap-3">
+          <p className="text-xs text-muted-foreground font-bold">Mire com o joystick e toque em CHUTAR</p>
+          <div className="flex items-center gap-6">
+            {/* Joystick de mira */}
+            <div ref={joyRef}
+              className="w-28 h-28 rounded-full bg-black/20 border-4 border-white/30 relative flex items-center justify-center touch-none"
+              onTouchStart={(e) => { e.preventDefault(); const t = e.touches[0]; handleJoyStart(t.clientX, t.clientY); }}
+              onTouchMove={(e) => { e.preventDefault(); const t = e.touches[0]; updateJoy(t.clientX, t.clientY, null); }}
+              onTouchEnd={handleJoyEnd}
+              onMouseDown={(e) => handleJoyStart(e.clientX, e.clientY)}
+              onMouseMove={(e) => e.buttons === 1 && updateJoy(e.clientX, e.clientY, null)}
+              onMouseUp={handleJoyEnd}>
+              <motion.div
+                animate={{ x: joystick.x * 28, y: joystick.y * 28 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                className="w-10 h-10 rounded-full bg-white/80 shadow-lg" />
             </div>
-            <motion.div
-              className="absolute w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg border-2 border-white"
-              style={{ left: '50%', top: '50%' }}
-              animate={{
-                x: Math.cos(aimAngle) * (aimPower / 100 * 25) - 20,
-                y: Math.sin(aimAngle) * (aimPower / 100 * 25) - 20,
-                scale: isAiming ? 1.1 : 1,
-              }}
-              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-            />
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <Target className="w-5 h-5 text-gray-400" />
-            </div>
-          </div>
-
-          <div className="flex-1 text-center">
-            <p className="text-xs text-gray-500 mb-2">Arraste para mirar</p>
-            <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-              <div className="bg-blue-500 h-2 rounded-full transition-all" style={{ width: `${aimPower}%` }} />
-            </div>
-          </div>
-
-          {/* Botão de chute */}
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            onClick={doShoot}
-            className="w-20 h-20 rounded-full bg-gradient-to-br from-green-500 to-green-600 shadow-lg border-4 border-white flex flex-col items-center justify-center"
-          >
-            <span className="text-2xl">⚽</span>
-            <span className="text-[10px] font-bold text-white">CHUTAR</span>
-          </motion.button>
-        </div>
-      ) : turn === 'bot' && phase === 'shooting' ? (
-        <div className="flex flex-col items-center gap-2 w-full max-w-sm">
-          <p className="text-xs text-gray-500 font-bold">⬅️ Arraste para defender ➡️</p>
-          <div
-            className="w-full h-16 rounded-2xl bg-gradient-to-r from-yellow-400/30 to-yellow-600/30 border-2 border-yellow-400 flex items-center justify-center cursor-ew-resize select-none relative overflow-hidden"
-            onTouchStart={(e) => { e.preventDefault(); handleDefendMove(e.touches[0].clientX); }}
-            onTouchMove={(e) => { e.preventDefault(); handleDefendMove(e.touches[0].clientX); }}
-            onMouseDown={(e) => handleDefendMove(e.clientX)}
-            onMouseMove={(e) => e.buttons === 1 && handleDefendMove(e.clientX)}
-          >
-            <motion.div animate={{ x: [0, 10, -10, 0] }} transition={{ duration: 0.5, repeat: Infinity }} className="text-3xl">🧤</motion.div>
-            <span className="text-xs text-yellow-700 font-bold ml-2">Deslize para defender!</span>
+            {/* Botão chutar */}
+            <motion.button whileTap={{ scale: 0.88 }}
+              onClick={() => shoot('player')}
+              className="w-24 h-24 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 text-white font-heading font-black text-base shadow-xl border-4 border-white/40">
+              ⚽<br/>CHUTAR
+            </motion.button>
           </div>
         </div>
-      ) : (
-        <div className="flex items-center gap-4">
-          <p className="text-xs text-gray-500 text-center flex-1">Aguarde o bot jogar...</p>
-          <button onClick={() => setSoundEnabled(!soundEnabled)} className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors">
-            {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-          </button>
+      )}
+
+      {turn === 'bot' && phase === 'playing' && (
+        <div className="w-full max-w-sm flex flex-col items-center gap-3">
+          <p className="text-xs font-bold text-muted-foreground">⬅️ Arraste para defender ➡️</p>
+          <div ref={defBarRef}
+            className="w-full h-16 rounded-2xl bg-gradient-to-r from-blue-400/40 to-blue-600/40 border-2 border-blue-400 flex items-center justify-center cursor-ew-resize relative overflow-hidden touch-none"
+            onTouchStart={(e) => { e.preventDefault(); handleDefend(e.touches[0].clientX); }}
+            onTouchMove={(e) => { e.preventDefault(); handleDefend(e.touches[0].clientX); }}
+            onMouseDown={(e) => { defending.current = true; handleDefend(e.clientX); }}
+            onMouseMove={(e) => { if (defending.current) handleDefend(e.clientX); }}
+            onMouseUp={() => { defending.current = false; }}>
+            <motion.div animate={{ x: [0, 12, -12, 0] }} transition={{ duration: 0.6, repeat: Infinity }}
+              className="text-4xl">👩</motion.div>
+            <span className="ml-2 text-xs text-blue-800 font-bold">Deslize para defender!</span>
+          </div>
+        </div>
+      )}
+
+      {phase === 'shooting' && (
+        <div className="text-center py-3 text-muted-foreground font-bold animate-pulse">
+          {turn === 'player' ? '⚽ Chutando...' : '🤖 Bot chutando...'}
         </div>
       )}
     </div>

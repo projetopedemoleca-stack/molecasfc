@@ -157,6 +157,11 @@ export default function DiarioMenstrual() {
 
       {tab === 'symptoms' && (
         <div className="space-y-4">
+          <div className="bg-card border border-border/30 rounded-2xl p-3 flex items-center gap-3">
+            <span className="text-sm font-bold">📅 Data:</span>
+            <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
+              className="flex-1 bg-muted rounded-xl px-3 py-1.5 text-sm" />
+          </div>
           <div className="bg-card border border-border/30 rounded-2xl p-4">
             <p className="font-bold text-sm mb-3">😊 Como você está hoje?</p>
             <div className="grid grid-cols-3 gap-2">
@@ -186,6 +191,9 @@ export default function DiarioMenstrual() {
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Como foi seu treino hoje?" className="w-full bg-muted rounded-xl px-3 py-2 text-sm h-20 resize-none" />
           </div>
 
+          <div className="bg-rose-50 border border-rose-200 rounded-xl px-4 py-2 text-sm text-rose-700 text-center">
+            📅 Registrando para: <strong>{new Date(selectedDate + 'T12:00:00').toLocaleDateString('pt-BR')}</strong>
+          </div>
           <button onClick={addCycle} className="w-full py-3 bg-rose-500 text-white rounded-xl font-heading font-bold">
             💾 Salvar Registro
           </button>
@@ -202,6 +210,30 @@ export default function DiarioMenstrual() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {cycles.length > 0 && (
+            <div className="bg-card border border-border/30 rounded-2xl p-4">
+              <p className="font-bold text-sm mb-3">📊 Meus Registros Salvos</p>
+              <div className="space-y-2">
+                {[...cycles].reverse().slice(0, 3).map((c, i) => {
+                  const moodObj = MOODS.find(m => m.id === c.mood);
+                  const symsLabels = (c.symptoms || []).map(sid => COMMON_SYMPTOMS.find(s => s.id === sid)?.label).filter(Boolean);
+                  return (
+                    <div key={c.id || i} className="bg-muted/40 rounded-xl p-3 border border-border/20">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-bold text-xs">📅 {new Date(c.date + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
+                        {moodObj && <span className="text-lg">{moodObj.emoji}</span>}
+                      </div>
+                      {symsLabels.length > 0 && (
+                        <p className="text-[10px] text-muted-foreground">{symsLabels.join(' · ')}</p>
+                      )}
+                      {c.notes && <p className="text-[10px] text-muted-foreground mt-1 italic">"{c.notes}"</p>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

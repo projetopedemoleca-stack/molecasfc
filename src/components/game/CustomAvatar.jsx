@@ -86,23 +86,38 @@ export default function CustomAvatar({
     ),
     hs4: (
       <>
-        <ellipse cx="60" cy="18" rx="30" ry="14" fill={hColor} />
-        <circle cx="36" cy="28" r="8" fill={hColor} />
-        <circle cx="84" cy="28" r="8" fill={hColor} />
-        <circle cx="40" cy="38" r="6" fill={hColor} />
-        <circle cx="80" cy="38" r="6" fill={hColor} />
-        <circle cx="52" cy="42" r="5" fill={hColor} />
-        <circle cx="68" cy="42" r="5" fill={hColor} />
-        <ellipse cx="60" cy="16" rx="22" ry="10" fill={hColor} opacity="0.6" />
+        {/* Base do cabelo no topo */}
+        <ellipse cx="60" cy="16" rx="28" ry="13" fill={hColor} />
+        {/* Cachos laterais esquerdos */}
+        <circle cx="33" cy="24" r="9" fill={hColor} />
+        <circle cx="30" cy="34" r="7" fill={hColor} />
+        <circle cx="34" cy="43" r="6" fill={hColor} />
+        {/* Cachos laterais direitos */}
+        <circle cx="87" cy="24" r="9" fill={hColor} />
+        <circle cx="90" cy="34" r="7" fill={hColor} />
+        <circle cx="86" cy="43" r="6" fill={hColor} />
+        {/* Fios na frente */}
+        <circle cx="45" cy="20" r="6" fill={hColor} opacity="0.8" />
+        <circle cx="60" cy="18" r="7" fill={hColor} opacity="0.8" />
+        <circle cx="75" cy="20" r="6" fill={hColor} opacity="0.8" />
       </>
     ),
     hs5: (
       <>
-        <rect x="34" y="12" width="52" height="16" rx="8" fill={hColor} />
-        <ellipse cx="60" cy="14" rx="18" ry="8" fill={hColor} />
-        <rect x="56" y="10" width="8" height="30" rx="4" fill={hColor} />
-        <ellipse cx="60" cy="40" rx="7" ry="4" fill={hColor} opacity="0.8" />
-        <rect x="55" y="40" width="10" height="20" rx="5" fill={hColor} opacity="0.7" />
+        {/* Base do cabelo */}
+        <rect x="34" y="14" width="52" height="14" rx="7" fill={hColor} />
+        {/* Laterais cobrindo as orelhas */}
+        <rect x="30" y="20" width="12" height="16" rx="6" fill={hColor} />
+        <rect x="78" y="20" width="12" height="16" rx="6" fill={hColor} />
+        {/* Elástico no topo */}
+        <circle cx="60" cy="14" r="6" fill={hColor} />
+        {/* Haste do rabo de cavalo */}
+        <rect x="57" y="6" width="6" height="28" rx="3" fill={hColor} />
+        {/* Ponta do rabo — caindo */}
+        <path d="M57 34 Q50 46 53 56" stroke={hColor} strokeWidth="5" fill="none" strokeLinecap="round" />
+        <path d="M63 34 Q70 46 67 56" stroke={hColor} strokeWidth="5" fill="none" strokeLinecap="round" />
+        {/* Volume no topo */}
+        <ellipse cx="60" cy="10" rx="12" ry="7" fill={hColor} opacity="0.7" />
       </>
     ),
     hs6: (

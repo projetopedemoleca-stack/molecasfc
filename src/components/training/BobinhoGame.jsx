@@ -1,210 +1,85 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// BobinhoGame — Jogo de passes com bobinho(s)
+// Fases: 2v1 → 3v1 → 4v1 → 5v2
+// Role: jogador (passa a bola, foge do bobinho) ou bobinho (pega a bola)
+// ═══════════════════════════════════════════════════════════════════════════
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, RotateCcw, Volume2, VolumeX, Users, User } from 'lucide-react';
-import { audio } from '@/lib/audioEngine';
-import { bgMusic } from '@/lib/trainingMusic';
 
-// ═══════════════════════════════════════════════════════════════════════════
-// BOBINHO - Passe a bola antes que te peguem!
-// Fases: 2v1, 3v1, 4v1, 5v2 (jogadores vs bobinhos)
-// Opção: ser jogador ou ser o bobinho
-// ═══════════════════════════════════════════════════════════════════════════
-
-const FIELD_W = 360;
+const FIELD_W = 340;
 const FIELD_H = 480;
-const PLAYER_R = 20;
+const PLAYER_R = 22;
 const BOBINHO_R = 22;
-const BALL_R = 10;
-
-const PHASES = [
-  { id: 1, players: 2, bobinhos: 1, label: '2 vs 1', time: 60, bobSpeed: 0.6, aiSpeed: 0.8, desc: 'Dois jogadores — bem fácil!' },
-  { id: 2, players: 3, bobinhos: 1, label: '3 vs 1', time: 70, bobSpeed: 0.9, aiSpeed: 1.0, desc: 'Três jogadores — tranquilo!' },
-  { id: 3, players: 4, bobinhos: 1, label: '4 vs 1', time: 80, bobSpeed: 1.2, aiSpeed: 1.2, desc: 'Quatro — o bobinho tá mais rápido!' },
-  { id: 4, players: 5, bobinhos: 2, label: '5 vs 2', time: 90, bobSpeed: 1.5, aiSpeed: 1.4, desc: 'Cinco jogadores, 2 bobinhos — caos!' },
-];
-
-const PLAYER_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899', '#8b5cf6'];
-const BOBINHO_COLOR = '#ef4444';
+const BALL_R = 12;
 
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 function dist(a, b) { return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2); }
 
-export default function BobinhoGame() {
-  const [phase, setPhase] = useState('menu'); // menu | playing | caught | win
-  const [currentPhase, setCurrentPhase] = useState(0);
-  const [role, setRole] = useState('player'); // 'player' | 'bobinho'
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [timeLeft, setTimeLeft] = useState(30);
-  const [passes, setPasses] = useState(0);
-  const [passTarget, setPassTarget] = useState(null);
-  
-  // Posições
-  const [players, setPlayers] = useState([]);
-  const [bobinhos, setBobinhos] = useState([]);
-  const [ballHolder, setBallHolder] = useState(0); // índice do jogador com a bola
-  const [ballPos, setBallPos] = useState({ x: 0, y: 0 });
-  
-  // Controles
-  const [selectedPlayer, setSelectedPlayer] = useState(0);
-  const [joystick, setJoystick] = useState({ x: 0, y: 0, active: false });
-  const joyRef = useRef(null);
-  const rafRef = useRef(null);
+const PHASES = [
+  { id: 1, players: 2, bobinhos: 1, label: '2 vs 1', time: 60, bobSpeed: 0.55, aiSpeed: 0.9, desc: 'Fácil — só dois jogadores' },
+  { id: 2, players: 3, bobinhos: 1, label: '3 vs 1', time: 70, bobSpeed: 0.80, aiSpeed: 1.1, desc: 'Tranquilo — três jogadores' },
+  { id: 3, players: 4, bobinhos: 1, label: '4 vs 1', time: 80, bobSpeed: 1.05, aiSpeed: 1.3, desc: 'Mais difícil — mais gente!' },
+  { id: 4, players: 5, bobinhos: 2, label: '5 vs 2', time: 90, bobSpeed: 1.30, aiSpeed: 1.5, desc: 'Caos total — 2 bobinhos!' },
+];
 
-  const config = PHASES[currentPhase];
+const COLORS = ['#E91E63','#2196F3','#4CAF50','#FF9800','#9C27B0'];
 
-  const playSound = (sound) => {
-    if (soundEnabled) audio.play?.(sound);
-  };
+export default function BobinhoGame({ onStickerEarned }) {
+  const [phase, setPhase]           = useState('menu');
+  const [phaseIdx, setPhaseIdx]     = useState(0);
+  const [role, setRole]             = useState('player');
+  const [players, setPlayers]       = useState([]);
+  const [bobinhos, setBobinhos]     = useState([]);
+  const [ballHolder, setBallHolder] = useState(0);
+  const [passes, setPasses]         = useState(0);
+  const [timeLeft, setTimeLeft]     = useState(60);
+  const [result, setResult]         = useState(null); // 'win' | 'lose'
+  const [joystick, setJoystick]     = useState({ x: 0, y: 0, active: false });
 
-  // Inicializar posições
-  const initPositions = useCallback(() => {
-    const newPlayers = [];
-    const centerX = FIELD_W / 2;
-    const centerY = FIELD_H / 2;
-    
-    // Jogadores em formação circular
-    for (let i = 0; i < config.players; i++) {
-      const angle = (i / config.players) * Math.PI * 2 - Math.PI / 2;
-      newPlayers.push({
-        id: i,
-        x: centerX + Math.cos(angle) * 80,
-        y: centerY + Math.sin(angle) * 80,
-        color: PLAYER_COLORS[i % PLAYER_COLORS.length],
-      });
-    }
-    
-    // Bobinhos fora do círculo
-    const newBobinhos = [];
-    for (let i = 0; i < config.bobinhos; i++) {
-      const angle = (i / config.bobinhos) * Math.PI * 2;
-      newBobinhos.push({
-        id: i,
-        x: centerX + Math.cos(angle) * 150,
-        y: centerY + Math.sin(angle) * 150,
-        vx: 0,
-        vy: 0,
-      });
-    }
-    
-    setPlayers(newPlayers);
-    setBobinhos(newBobinhos);
-    setBallHolder(0);
-    setBallPos({ x: newPlayers[0].x, y: newPlayers[0].y });
-    setSelectedPlayer(0); // sempre controla o índice 0 (jogador ou bobinho)
-    setPasses(0);
-    setTimeLeft(config.time);
-  }, [config, role]);
+  const joyRef    = useRef(null);
+  const joyCtrRef = useRef(null);
+  const rafRef    = useRef(null);
+  const stateRef  = useRef({});
 
-  // Iniciar fase
-  const startPhase = useCallback((phaseIdx) => {
-    setCurrentPhase(phaseIdx);
-    initPositions();
-    setPhase('playing');
-    playSound('start');
-    try { bgMusic.play('sport'); } catch {}
-  }, [initPositions]);
-
-  // Game loop
+  // Sempre sincroniza o ref com o state mais recente
   useEffect(() => {
-    if (phase !== 'playing') { cancelAnimationFrame(rafRef.current); return; }
+    stateRef.current = { players, bobinhos, ballHolder, joystick, phase, role };
+  });
 
-    const loop = () => {
-      // Mover jogador selecionado
-      if (role === 'player' && joystick.active) {
-        setPlayers(prev => {
-          const updated = [...prev];
-          const p = updated[selectedPlayer];
-          const speed = 3;
-          p.x = clamp(p.x + joystick.x * speed, PLAYER_R, FIELD_W - PLAYER_R);
-          p.y = clamp(p.y + joystick.y * speed, PLAYER_R, FIELD_H - PLAYER_R);
-          
-          // Se tem a bola, move ela também
-          if (ballHolder === selectedPlayer) {
-            setBallPos({ x: p.x, y: p.y });
-          }
-          return updated;
-        });
-      }
+  const config = PHASES[phaseIdx];
 
-      // Mover bobinho selecionado (quando role é bobinho)
-      if (role === 'bobinho' && joystick.active) {
-        setBobinhos(prev => {
-          const updated = [...prev];
-          const b = { ...updated[0] };
-          const speed = 3;
-          b.x = clamp(b.x + joystick.x * speed, BOBINHO_R, FIELD_W - BOBINHO_R);
-          b.y = clamp(b.y + joystick.y * speed, BOBINHO_R, FIELD_H - BOBINHO_R);
-          updated[0] = b;
-          return updated;
-        });
-      }
+  // ── Inicializar posições ──────────────────────────────────────────────────
+  const initGame = useCallback((pIdx, r) => {
+    const cfg = PHASES[pIdx];
+    const ps = Array.from({ length: cfg.players }, (_, i) => ({
+      x: 60 + (i % 3) * 110,
+      y: 120 + Math.floor(i / 3) * 160,
+      color: COLORS[i % COLORS.length],
+      id: i,
+    }));
+    const bs = Array.from({ length: cfg.bobinhos }, (_, i) => ({
+      x: FIELD_W / 2 + (i - 0.5) * 80,
+      y: FIELD_H / 2,
+      id: i,
+    }));
+    setPlayers(ps);
+    setBobinhos(bs);
+    setBallHolder(0);
+    setPasses(0);
+    setTimeLeft(cfg.time);
+    setResult(null);
+    setPhase('playing');
+  }, []);
 
-      // IA dos outros jogadores (se você é um jogador)
-      if (role === 'player') {
-        setPlayers(prev => {
-          const updated = [...prev];
-          updated.forEach((p, i) => {
-            if (i !== selectedPlayer && i !== ballHolder) {
-              const nearestBobinho = bobinhos.reduce((closest, b) => {
-                const d = dist(p, b);
-                return d < dist(p, closest) ? b : closest;
-              }, bobinhos[0]);
-              const dx = p.x - nearestBobinho.x;
-              const dy = p.y - nearestBobinho.y;
-              const d = Math.sqrt(dx * dx + dy * dy) || 1;
-              const speed = config.aiSpeed;
-              if (dist(p, nearestBobinho) < 120) {
-                p.x = clamp(p.x + (dx / d) * speed, PLAYER_R, FIELD_W - PLAYER_R);
-                p.y = clamp(p.y + (dy / d) * speed, PLAYER_R, FIELD_H - PLAYER_R);
-              }
-            }
-          });
-          return updated;
-        });
-      }
-
-      // IA do bobinho
-      setBobinhos(prev => {
-        return prev.map((b, idx) => {
-          // Quando role é bobinho, o índice 0 é controlado pelo jogador (joystick)
-          if (role === 'bobinho' && idx === 0) return b;
-          const target = players[ballHolder];
-          const dx = target.x - b.x;
-          const dy = target.y - b.y;
-          const d = Math.sqrt(dx * dx + dy * dy) || 1;
-          const speed = config.bobSpeed;
-          return {
-            ...b,
-            x: clamp(b.x + (dx / d) * speed, BOBINHO_R, FIELD_W - BOBINHO_R),
-            y: clamp(b.y + (dy / d) * speed, BOBINHO_R, FIELD_H - BOBINHO_R),
-          };
-        });
-      });
-
-      // Verificar se bobinho pegou a bola
-      const ballHolderPos = players[ballHolder];
-      bobinhos.forEach(b => {
-        if (dist(ballHolderPos, b) < PLAYER_R + BOBINHO_R) {
-          setPhase('caught');
-          playSound('lose');
-        }
-      });
-
-      rafRef.current = requestAnimationFrame(loop);
-    };
-
-    rafRef.current = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [phase, joystick, players, bobinhos, ballHolder, selectedPlayer, role]);
-
-  // Timer
+  // ── Timer ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (phase !== 'playing') return;
     const t = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 1) {
-          setPhase('win');
-          playSound('win');
+          clearInterval(t);
+          setPhase('result');
+          setResult('win');
           return 0;
         }
         return prev - 1;
@@ -213,400 +88,344 @@ export default function BobinhoGame() {
     return () => clearInterval(t);
   }, [phase]);
 
-  // Auto-passe inteligente dos bots
+  // ── Game loop (RAF) ───────────────────────────────────────────────────────
   useEffect(() => {
-    if (phase !== 'playing') return;
-    // O jogador humano passa manualmente; bots passam automaticamente
-    if (role === 'player' && ballHolder === selectedPlayer) return;
+    if (phase !== 'playing') {
+      cancelAnimationFrame(rafRef.current);
+      return;
+    }
 
-    // Bot com a bola: passar para o jogador mais seguro após 1.5s
-    const t = setTimeout(() => {
-      if (phase !== 'playing') return;
-      if (players.length === 0 || bobinhos.length === 0) return;
+    const loop = () => {
+      const { players: ps, bobinhos: bs, ballHolder: bh, joystick: joy, phase: ph, role: rl } = stateRef.current;
+      if (ph !== 'playing') return;
 
-      // Encontrar jogador mais seguro (mais longe de todos os bobinhos)
-      let bestTarget = -1;
-      let bestDist = -1;
-      players.forEach((p, i) => {
-        if (i === ballHolder) return;
-        const minBobDist = bobinhos.reduce((minD, b) => Math.min(minD, dist(p, b)), Infinity);
-        if (minBobDist > bestDist) {
-          bestDist = minBobDist;
-          bestTarget = i;
+      const cfg = PHASES[phaseIdx];
+
+      // ── Mover personagem controlado pelo joystick ──
+      if (joy.active) {
+        if (rl === 'player') {
+          // Joystick move o jogador[0]
+          setPlayers(prev => {
+            const upd = [...prev];
+            if (!upd[0]) return prev;
+            upd[0] = {
+              ...upd[0],
+              x: clamp(upd[0].x + joy.x * 3.5, PLAYER_R, FIELD_W - PLAYER_R),
+              y: clamp(upd[0].y + joy.y * 3.5, PLAYER_R, FIELD_H - PLAYER_R),
+            };
+            return upd;
+          });
+        } else {
+          // Joystick move o bobinho[0]
+          setBobinhos(prev => {
+            const upd = [...prev];
+            if (!upd[0]) return prev;
+            upd[0] = {
+              ...upd[0],
+              x: clamp(upd[0].x + joy.x * 3.5, BOBINHO_R, FIELD_W - BOBINHO_R),
+              y: clamp(upd[0].y + joy.y * 3.5, BOBINHO_R, FIELD_H - BOBINHO_R),
+            };
+            return upd;
+          });
         }
+      }
+
+      // ── IA dos outros jogadores (fogem dos bobinhos) ──
+      setPlayers(prev => {
+        const upd = prev.map((p, i) => {
+          if (i === 0 && rl === 'player') return p; // jogador[0] é controlado manualmente
+          const nearestBob = bs.reduce((n, b) => dist(p, b) < dist(p, n) ? b : n, bs[0] || { x: -999, y: -999 });
+          const d = dist(p, nearestBob);
+          if (d > 130) return p;
+          const dx = p.x - nearestBob.x;
+          const dy = p.y - nearestBob.y;
+          const mag = Math.sqrt(dx * dx + dy * dy) || 1;
+          return {
+            ...p,
+            x: clamp(p.x + (dx / mag) * cfg.aiSpeed, PLAYER_R, FIELD_W - PLAYER_R),
+            y: clamp(p.y + (dy / mag) * cfg.aiSpeed, PLAYER_R, FIELD_H - PLAYER_R),
+          };
+        });
+        return upd;
       });
 
-      if (bestTarget >= 0) {
-        setBallHolder(bestTarget);
-        setBallPos({ x: players[bestTarget].x, y: players[bestTarget].y });
-        setPasses(prev => prev + 1);
+      // ── IA dos bobinhos (perseguem quem tem a bola) ──
+      setBobinhos(prev => prev.map((b, i) => {
+        if (i === 0 && rl === 'bobinho') return b; // bobinho[0] é controlado manualmente
+        const target = ps[bh] || ps[0];
+        if (!target) return b;
+        const dx = target.x - b.x;
+        const dy = target.y - b.y;
+        const mag = Math.sqrt(dx * dx + dy * dy) || 1;
+        return {
+          ...b,
+          x: clamp(b.x + (dx / mag) * cfg.bobSpeed, BOBINHO_R, FIELD_W - BOBINHO_R),
+          y: clamp(b.y + (dy / mag) * cfg.bobSpeed, BOBINHO_R, FIELD_H - BOBINHO_R),
+        };
+      }));
+
+      // ── Verificar colisão bobinho com ball holder ──
+      const holder = ps[bh];
+      if (holder) {
+        const caught = bs.some(b => dist(holder, b) < PLAYER_R + BOBINHO_R - 4);
+        if (caught) {
+          setPhase('result');
+          setResult('lose');
+          return;
+        }
       }
-    }, 1500 + Math.random() * 500);
 
+      rafRef.current = requestAnimationFrame(loop);
+    };
+
+    rafRef.current = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [phase, phaseIdx]);
+
+  // ── Auto-passe dos jogadores IA (que não são o jogador humano) ──
+  useEffect(() => {
+    if (phase !== 'playing') return;
+    // O jogador humano (role='player', idx 0) passa manualmente
+    if (role === 'player' && ballHolder === 0) return;
+
+    const delay = 1200 + Math.random() * 600;
+    const t = setTimeout(() => {
+      setPlayers(currPs => {
+        setBobinhos(currBs => {
+          // Encontrar jogador mais seguro (mais longe de todos os bobinhos)
+          let best = -1, bestScore = -1;
+          currPs.forEach((p, i) => {
+            if (i === ballHolder) return;
+            const minBob = currBs.reduce((m, b) => Math.min(m, dist(p, b)), Infinity);
+            if (minBob > bestScore) { bestScore = minBob; best = i; }
+          });
+          if (best >= 0) {
+            setBallHolder(best);
+            setPasses(prev => prev + 1);
+          }
+          return currBs;
+        });
+        return currPs;
+      });
+    }, delay);
     return () => clearTimeout(t);
-  }, [ballHolder, phase]);
+  }, [ballHolder, phase, role]);
 
-  // Passar a bola
+  // ── Passe manual (toque num jogador) ──
   const passBall = (targetIdx) => {
-    if (ballHolder !== selectedPlayer || targetIdx === ballHolder) return;
-    
+    if (role !== 'player' || ballHolder !== 0) return;
     setBallHolder(targetIdx);
-    setBallPos({ x: players[targetIdx].x, y: players[targetIdx].y });
-    setPasses(p => p + 1);
-    playSound('pass');
-    
-    // Verificar vitória por passes
-    if (passes + 1 >= config.players * 2) {
-      setPhase('win');
-      playSound('win');
-    }
+    setPasses(prev => prev + 1);
   };
 
-  // Joystick handlers
+  // ── Joystick handlers ──
   const handleJoyStart = (clientX, clientY) => {
     if (!joyRef.current) return;
     const rect = joyRef.current.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    setJoystick({ x: 0, y: 0, active: true, centerX, centerY });
+    const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    joyCtrRef.current = center;
+    updateJoystick(clientX, clientY, center);
   };
-
-  const handleJoyMove = (clientX, clientY) => {
-    if (!joystick.active) return;
-    const maxDist = 35;
-    const dx = clientX - joystick.centerX;
-    const dy = clientY - joystick.centerY;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    const scale = Math.min(distance, maxDist) / maxDist;
+  const updateJoystick = (clientX, clientY, center) => {
+    const c = center || joyCtrRef.current;
+    if (!c) return;
+    const maxDist = 40;
+    const dx = clientX - c.x;
+    const dy = clientY - c.y;
+    const dist2 = Math.sqrt(dx * dx + dy * dy);
+    const scale = Math.min(dist2, maxDist) / maxDist;
     const angle = Math.atan2(dy, dx);
-    setJoystick(prev => ({
-      ...prev,
-      x: Math.cos(angle) * scale,
-      y: Math.sin(angle) * scale,
-    }));
+    setJoystick({ x: Math.cos(angle) * scale, y: Math.sin(angle) * scale, active: true });
   };
-
   const handleJoyEnd = () => {
-    setJoystick({ x: 0, y: 0, active: false, centerX: 0, centerY: 0 });
+    joyCtrRef.current = null;
+    setJoystick({ x: 0, y: 0, active: false });
   };
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // RENDERIZAÇÃO
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  // Menu
+  // ── Render: Menu ─────────────────────────────────────────────────────────
   if (phase === 'menu') {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[80vh] gap-6 px-4">
-        <motion.div 
-          initial={{ scale: 0.8, opacity: 0 }} 
-          animate={{ scale: 1, opacity: 1 }} 
-          className="text-center"
-        >
-          <motion.div 
-            animate={{ rotate: [0, 15, -15, 0] }} 
-            transition={{ duration: 1, repeat: Infinity }}
-            className="text-6xl mb-2"
-          >🏃‍♀️</motion.div>
-          <h1 className="font-heading font-black text-3xl text-primary mb-1">Bobinho</h1>
-          <p className="text-gray-500 text-sm px-8 text-center">
-            Passe a bola entre os jogadores antes que o bobinho te pegue!
-          </p>
+      <div className="flex flex-col items-center gap-5 py-4 px-4">
+        <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center">
+          <motion.div animate={{ rotate: [0, 10, -10, 0] }} transition={{ duration: 2, repeat: Infinity }} className="text-5xl mb-2">⚽</motion.div>
+          <h1 className="font-heading font-black text-2xl text-primary">Bobinho</h1>
+          <p className="text-xs text-muted-foreground">Passe a bola sem deixar o bobinho pegar!</p>
         </motion.div>
 
-        {/* Seleção de papel */}
+        {/* Escolha de papel */}
         <div className="w-full max-w-xs">
-          <p className="text-xs font-bold text-gray-500 mb-2 uppercase">Escolha seu papel</p>
-          <div className="flex gap-3">
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setRole('player')}
-              className={`flex-1 py-4 rounded-2xl border-2 flex flex-col items-center gap-2 transition-all ${
-                role === 'player' 
-                  ? 'border-blue-500 bg-blue-50' 
-                  : 'border-gray-200 bg-white'
-              }`}
-            >
-              <Users className="w-8 h-8 text-blue-500" />
-              <span className="font-bold text-sm">Jogador</span>
-              <span className="text-[10px] text-gray-500">Passe a bola</span>
-            </motion.button>
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setRole('bobinho')}
-              className={`flex-1 py-4 rounded-2xl border-2 flex flex-col items-center gap-2 transition-all ${
-                role === 'bobinho' 
-                  ? 'border-red-500 bg-red-50' 
-                  : 'border-gray-200 bg-white'
-              }`}
-            >
-              <User className="w-8 h-8 text-red-500" />
-              <span className="font-bold text-sm">Bobinho</span>
-              <span className="text-[10px] text-gray-500">Pegue a bola</span>
-            </motion.button>
-          </div>
-        </div>
-
-        {/* Fases */}
-        <div className="w-full max-w-xs">
-          <p className="text-xs font-bold text-gray-500 mb-2 uppercase">Fase</p>
-          <div className="grid grid-cols-2 gap-2">
-            {PHASES.map((p, i) => (
-              <motion.button
-                key={p.id}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => startPhase(i)}
-                className="p-3 rounded-xl border-2 border-gray-200 bg-white hover:border-primary transition-all text-left"
-              >
-                <span className="font-bold text-sm block">{p.label}</span>
-                <span className="text-[10px] text-gray-500">{p.desc}</span>
+          <p className="text-xs font-bold text-gray-500 mb-2 uppercase text-center">Você quer ser…</p>
+          <div className="grid grid-cols-2 gap-3">
+            {[{ id: 'player', label: 'Jogador', desc: 'Passe a bola e fuja!', emoji: '🏃‍♀️' },
+              { id: 'bobinho', label: 'Bobinho', desc: 'Pegue a bola!', emoji: '😈' }].map(r => (
+              <motion.button key={r.id} whileTap={{ scale: 0.95 }}
+                onClick={() => setRole(r.id)}
+                className={`p-4 rounded-2xl border-2 text-center transition-all ${role === r.id ? 'border-primary bg-primary/10' : 'border-border/30 bg-card'}`}>
+                <div className="text-3xl mb-1">{r.emoji}</div>
+                <div className="font-bold text-sm">{r.label}</div>
+                <div className="text-[9px] text-muted-foreground">{r.desc}</div>
               </motion.button>
             ))}
           </div>
         </div>
-      </div>
-    );
-  }
 
-  // Resultado
-  if (phase === 'caught' || phase === 'win') {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[80vh] gap-6 px-4">
-        <motion.div
-          initial={{ scale: 0, rotate: -180 }}
-          animate={{ scale: 1, rotate: 0 }}
-          className="text-center"
-        >
-          <div className="text-7xl mb-4">{phase === 'win' ? '🏆' : '😅'}</div>
-          <h2 className="font-heading font-black text-3xl text-primary mb-2">
-            {phase === 'win' ? 'Vitória!' : 'Pegaram!'}
-          </h2>
-          <p className="text-gray-500">
-            {phase === 'win' 
-              ? `Você completou ${config.label}!` 
-              : 'O bobinho pegou a bola!'}
-          </p>
-          <div className="mt-4 text-4xl font-bold text-primary">{passes} passes</div>
-        </motion.div>
-
-        <div className="flex gap-3 w-full max-w-xs">
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setPhase('menu')}
-            className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl"
-          >
-            Menu
-          </motion.button>
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={() => startPhase(currentPhase)}
-            className="flex-1 py-3 bg-gradient-to-r from-primary to-green-500 text-white font-bold rounded-xl shadow-lg"
-          >
-            Jogar Novamente
-          </motion.button>
-          {phase === 'win' && currentPhase < PHASES.length - 1 && (
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={() => startPhase(currentPhase + 1)}
-              className="flex-1 py-3 bg-gradient-to-r from-yellow-500 to-amber-500 text-white font-bold rounded-xl shadow-lg"
-            >
-              Próxima →
+        {/* Escolha de fase */}
+        <div className="w-full max-w-xs space-y-2">
+          <p className="text-xs font-bold text-gray-500 mb-1 uppercase text-center">Fase</p>
+          {PHASES.map((ph, i) => (
+            <motion.button key={ph.id} whileTap={{ scale: 0.97 }}
+              onClick={() => setPhaseIdx(i)}
+              className={`w-full py-3 px-4 rounded-2xl border-2 text-left flex justify-between items-center transition-all ${phaseIdx === i ? 'border-primary bg-primary/10' : 'border-border/30 bg-card'}`}>
+              <div>
+                <div className="font-bold text-sm">{ph.label}</div>
+                <div className="text-[9px] text-muted-foreground">{ph.desc}</div>
+              </div>
+              {phaseIdx === i && <span className="text-primary font-bold text-lg">✓</span>}
             </motion.button>
-          )}
+          ))}
         </div>
+
+        <motion.button whileTap={{ scale: 0.95 }}
+          onClick={() => initGame(phaseIdx, role)}
+          className="w-full max-w-xs py-4 bg-gradient-to-r from-primary to-pink-500 text-white font-heading font-black text-lg rounded-2xl shadow-lg">
+          Jogar! ⚽
+        </motion.button>
       </div>
     );
   }
 
-  // Jogo
+  // ── Render: Result ────────────────────────────────────────────────────────
+  if (phase === 'result') {
+    const won = result === 'win';
+    return (
+      <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
+        className="flex flex-col items-center justify-center min-h-[70vh] gap-5 px-4">
+        <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1.5 }}
+          className="text-7xl">{won ? '🏆' : '😅'}</motion.div>
+        <div className="text-center">
+          <h2 className="font-heading font-black text-2xl mb-1">{won ? 'Boa! Conseguiu!' : 'O bobinho pegou!'}</h2>
+          <p className="text-muted-foreground">{passes} passes realizados</p>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={() => initGame(phaseIdx, role)}
+            className="px-6 py-3 bg-primary text-white font-bold rounded-2xl shadow-lg">
+            Jogar de novo
+          </button>
+          <button onClick={() => setPhase('menu')}
+            className="px-6 py-3 bg-muted font-bold rounded-2xl">
+            Menu
+          </button>
+        </div>
+      </motion.div>
+    );
+  }
+
+  // ── Render: Playing ───────────────────────────────────────────────────────
+  const holderPos = players[ballHolder] || { x: 0, y: 0 };
+
   return (
-    <div className="flex flex-col items-center gap-3 p-2">
+    <div className="flex flex-col items-center gap-3 select-none">
       {/* HUD */}
-      <div className="flex justify-between items-center w-full max-w-sm px-2">
-        <div className="text-center">
-          <div className="text-xs text-gray-500">Fase</div>
-          <div className="font-bold text-primary">{config.label}</div>
+      <div className="flex items-center justify-between w-full max-w-sm px-2">
+        <div className="bg-card rounded-2xl px-4 py-2 font-bold text-sm shadow-sm">
+          ⚽ {passes} passes
         </div>
-        
-        <div className="text-center">
-          <div className="text-xs text-gray-500">Passes</div>
-          <motion.div 
-            key={passes}
-            initial={{ scale: 1.5 }}
-            animate={{ scale: 1 }}
-            className="text-2xl font-black text-primary"
-          >
-            {passes}
-          </motion.div>
+        <div className={`bg-card rounded-2xl px-4 py-2 font-bold shadow-sm ${timeLeft <= 10 ? 'text-red-500 animate-pulse' : 'text-primary'}`}>
+          ⏱ {timeLeft}s
         </div>
-        
-        <div className="text-center">
-          <div className="text-xs text-gray-500">Tempo</div>
-          <div className={`font-bold text-lg ${timeLeft <= 10 ? 'text-red-500' : 'text-primary'}`}>
-            {timeLeft}s
-          </div>
+        <div className="bg-card rounded-2xl px-3 py-2 text-xs font-bold shadow-sm">
+          {config.label}
         </div>
       </div>
 
       {/* Campo */}
-      <div
-        className="relative rounded-2xl overflow-hidden shadow-2xl"
-        style={{ 
-          width: FIELD_W, 
-          height: FIELD_H, 
-          background: 'linear-gradient(180deg, #4ade80 0%, #22c55e 100%)'
-        }}
-      >
+      <div className="relative bg-gradient-to-b from-green-600 to-green-700 rounded-2xl shadow-2xl overflow-hidden"
+        style={{ width: FIELD_W, height: FIELD_H }}>
         {/* Linhas do campo */}
         <div className="absolute inset-0 opacity-20">
           <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-white" />
-          <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-white" />
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 rounded-full border-2 border-white" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full border-2 border-white" />
         </div>
 
         {/* Jogadores */}
         {players.map((p, i) => (
-          <motion.div
-            key={p.id}
+          <motion.div key={p.id}
+            animate={{ x: p.x - PLAYER_R, y: p.y - PLAYER_R }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             className="absolute"
-            style={{ 
-              left: p.x - PLAYER_R, 
-              top: p.y - PLAYER_R,
-              zIndex: ballHolder === i ? 20 : 10
-            }}
-            animate={{ scale: selectedPlayer === i && role === 'player' ? 1.15 : 1 }}
-          >
-            <div 
-              className="w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold shadow-lg border-2 border-white"
-              style={{ background: p.color }}
-              onClick={() => role === 'player' && ballHolder === selectedPlayer && passBall(i)}
-            >
-              {ballHolder === i ? '⚽' : i + 1}
+            onClick={() => passBall(i)}
+            style={{ width: PLAYER_R * 2, height: PLAYER_R * 2 }}>
+            <div className="w-full h-full rounded-full flex items-center justify-center font-black text-white text-xs shadow-lg border-3 border-white"
+              style={{ background: p.color, boxShadow: ballHolder === i ? `0 0 0 4px white, 0 0 0 6px ${p.color}` : undefined }}>
+              {i === 0 && role === 'player' ? '⭐' : `P${i + 1}`}
             </div>
             {ballHolder === i && (
-              <motion.div
-                animate={{ opacity: [0.5, 1, 0.5] }}
-                transition={{ duration: 1, repeat: Infinity }}
-                className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-yellow-400 rounded-full"
-              />
+              <motion.div animate={{ scale: [1, 1.3, 1] }} transition={{ repeat: Infinity, duration: 0.5 }}
+                className="absolute -top-4 left-1/2 -translate-x-1/2 text-xs">⚽</motion.div>
             )}
           </motion.div>
         ))}
 
         {/* Bobinhos */}
         {bobinhos.map((b, i) => (
-          <motion.div
-            key={b.id}
-            className="absolute z-15"
-            style={{ left: b.x - BOBINHO_R, top: b.y - BOBINHO_R }}
-            animate={{ 
-              scale: dist(b, players[ballHolder]) < 60 ? [1, 1.1, 1] : 1,
-            }}
-            transition={{ duration: 0.3 }}
-          >
-            <div 
-              className="w-11 h-11 rounded-full flex items-center justify-center text-xl shadow-lg border-2 border-white"
-              style={{ 
-                background: BOBINHO_COLOR,
-                boxShadow: dist(b, players[ballHolder]) < 60 
-                  ? '0 0 20px rgba(239, 68, 68, 0.8)' 
-                  : '0 4px 10px rgba(0,0,0,0.3)',
-              }}
-            >
-              😤
+          <motion.div key={b.id}
+            animate={{ x: b.x - BOBINHO_R, y: b.y - BOBINHO_R }}
+            transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+            className="absolute"
+            style={{ width: BOBINHO_R * 2, height: BOBINHO_R * 2 }}>
+            <div className="w-full h-full rounded-full bg-red-500 flex items-center justify-center text-white font-black text-sm shadow-lg border-2 border-red-300">
+              {i === 0 && role === 'bobinho' ? '⭐' : '😈'}
             </div>
           </motion.div>
         ))}
+      </div>
 
-        {/* Botões de passe (visíveis quando tem a bola) */}
-        {role === 'player' && ballHolder === selectedPlayer && (
-          <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 px-4">
-            {players.map((p, i) => (
-              i !== selectedPlayer && (
-                <motion.button
-                  key={i}
-                  whileTap={{ scale: 0.9 }}
+      {/* Controles */}
+      <div className="flex items-center gap-6 py-2">
+        {/* Joystick */}
+        <div ref={joyRef}
+          className="w-32 h-32 rounded-full bg-black/20 border-4 border-white/30 relative flex items-center justify-center touch-none"
+          onTouchStart={(e) => { e.preventDefault(); const t = e.touches[0]; handleJoyStart(t.clientX, t.clientY); }}
+          onTouchMove={(e) => { e.preventDefault(); const t = e.touches[0]; updateJoystick(t.clientX, t.clientY, null); }}
+          onTouchEnd={handleJoyEnd}
+          onMouseDown={(e) => handleJoyStart(e.clientX, e.clientY)}
+          onMouseMove={(e) => e.buttons === 1 && updateJoystick(e.clientX, e.clientY, null)}
+          onMouseUp={handleJoyEnd}>
+          <motion.div
+            animate={{ x: joystick.x * 30, y: joystick.y * 30 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+            className="w-12 h-12 rounded-full bg-white/80 shadow-lg" />
+        </div>
+
+        {/* Botões de passe (só quando jogador tem a bola) */}
+        {role === 'player' && ballHolder === 0 && (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-bold text-center text-muted-foreground">Passar para:</p>
+            <div className="flex flex-wrap gap-2 max-w-[120px]">
+              {players.map((p, i) => i !== 0 && (
+                <motion.button key={i} whileTap={{ scale: 0.85 }}
                   onClick={() => passBall(i)}
-                  className="w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center font-bold text-sm"
-                  style={{ color: p.color }}
-                >
-                  {i + 1}
+                  className="w-10 h-10 rounded-full font-black text-white text-xs shadow-lg"
+                  style={{ background: p.color }}>
+                  P{i + 1}
                 </motion.button>
-              )
-            ))}
+              ))}
+            </div>
+          </div>
+        )}
+        {role === 'bobinho' && (
+          <div className="text-center">
+            <p className="text-xs font-bold text-muted-foreground">Você é o</p>
+            <p className="text-3xl">😈</p>
+            <p className="text-xs text-red-500 font-bold">Pega a bola!</p>
           </div>
         )}
       </div>
 
-      {/* Controles */}
-      <div className="flex items-center gap-4 w-full max-w-sm">
-        {(role === 'player' || role === 'bobinho') ? (
-          <>
-            <div
-              ref={joyRef}
-              className="relative w-24 h-24 rounded-full bg-gray-200/60 border-2 border-gray-300 shadow-inner"
-              onTouchStart={(e) => { e.preventDefault(); handleJoyStart(e.touches[0].clientX, e.touches[0].clientY); }}
-              onTouchMove={(e) => { e.preventDefault(); handleJoyMove(e.touches[0].clientX, e.touches[0].clientY); }}
-              onTouchEnd={(e) => { e.preventDefault(); handleJoyEnd(); }}
-              onMouseDown={(e) => handleJoyStart(e.clientX, e.clientY)}
-              onMouseMove={(e) => handleJoyMove(e.clientX, e.clientY)}
-              onMouseUp={handleJoyEnd}
-              onMouseLeave={handleJoyEnd}
-            >
-              <motion.div
-                className={`absolute w-10 h-10 rounded-full shadow-lg border-2 border-white ${role === 'bobinho' ? 'bg-gradient-to-br from-red-500 to-red-700' : 'bg-gradient-to-br from-primary to-green-600'}`}
-                style={{ left: '50%', top: '50%' }}
-                animate={{
-                  x: joystick.x * 25 - 20,
-                  y: joystick.y * 25 - 20,
-                  scale: joystick.active ? 1.1 : 1,
-                }}
-                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-              />
-            </div>
-            <div className="flex-1 text-center">
-              {role === 'player' ? (
-                <p className="text-xs text-gray-500">
-                  {ballHolder === selectedPlayer 
-                    ? 'Você tem a bola! Toque nos números para passar' 
-                    : 'Mova-se com o joystick'}
-                </p>
-              ) : (
-                <div>
-                  <p className="text-sm font-bold text-red-500">Você é o Bobinho!</p>
-                  <p className="text-xs text-gray-500">Use o joystick para pegar a bola!</p>
-                </div>
-              )}
-            </div>
-          </>
-        ) : null}
-        
-        <button
-          onClick={() => setSoundEnabled(!soundEnabled)}
-          className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
-        >
-          {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-        </button>
-        <button
-          onClick={() => setPhase('menu')}
-          className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
-        >
-          <RotateCcw className="w-4 h-4" />
-        </button>
-      </div>
-
-      {role === 'player' && phase === 'playing' && ballHolder === selectedPlayer && (
-        <div className="flex gap-2 flex-wrap justify-center w-full max-w-sm">
-          {players.map((p, i) => i !== selectedPlayer && (
-            <motion.button key={i} whileTap={{ scale: 0.9 }}
-              onClick={() => passBall(i)}
-              className="px-4 py-2 rounded-xl font-bold text-xs text-white shadow-lg"
-              style={{ background: p.color }}>
-              Passar →{i + 1}
-            </motion.button>
-          ))}
-        </div>
-      )}
+      <button onClick={() => { cancelAnimationFrame(rafRef.current); setPhase('menu'); }}
+        className="text-xs text-muted-foreground underline">
+        Sair
+      </button>
     </div>
   );
 }
