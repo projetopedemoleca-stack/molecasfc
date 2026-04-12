@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 
@@ -56,7 +56,7 @@ const TOPICS = [
     content: [
       { icon: '🧼', title: 'Lave as mãos!', text: 'Antes das refeições e após o banheiro. Use sabão e água por 20 segundos.' },
       { icon: '🚿', title: 'Banho pós-treino', text: 'Sempre tome banho após treinar ou jogar. Suor + bactérias = odor e irritações.' },
-      { icon: '🦷', title: 'Escove os dentes', text: '2x ao dia, por 2 minutos. Fio dental é seu amigo!' },
+      { icon: '🦷', title: 'Escove os dentes', text: '3x ao dia, por 2 minutos: manhã, após almoço e antes de dormir. Fio dental é seu amigo!' },
       { icon: '💅', title: 'Unhas curtas', text: 'Unhas limpas e cortadas evitam acidentes e acúmulo de sujeira.' },
       { icon: '🧴', title: 'Hidrate a pele', text: 'Após o banho aplique hidratante. A pele da atleta resiste ao sol e ao esforço.' },
     ],
@@ -115,10 +115,226 @@ const TOPICS = [
   },
 ];
 
+// ─── Jogo de Memória das Emoções ─────────────────────────────────────────
+function EmotionMemoryGame({ onClose }) {
+  const PAIRS_COUNT = 8;
+  const pool = EMOTIONS.slice(0, 16);
+  
+  const makeDeck = () => {
+    const picked = pool.sort(() => Math.random() - 0.5).slice(0, PAIRS_COUNT);
+    return [...picked, ...picked]
+      .sort(() => Math.random() - 0.5)
+      .map((em, i) => ({ ...em, uid: i, flipped: false, matched: false }));
+  };
+
+  const [cards, setCards] = useState(makeDeck);
+  const [selected, setSelected] = useState([]);
+  const [moves, setMoves] = useState(0);
+  const [botMoves, setBotMoves] = useState(0);
+  const [phase, setPhase] = useState('player'); // player | bot | done
+  const [botMemory, setBotMemory] = useState({}); // uid → emoji
+  const [winner, setWinner] = useState(null);
+  const timerRef = useRef(null);
+
+  const playerScore = cards.filter(c => c.matched && c.matchedBy === 'player').length / 2;
+  const botScore    = cards.filter(c => c.matched && c.matchedBy === 'bot').length / 2;
+  const totalPairs  = PAIRS_COUNT;
+
+  // Verifica fim do jogo
+  useEffect(() => {
+    const matched = cards.filter(c => c.matched).length;
+    if (matched === totalPairs * 2 && phase !== 'done') {
+      setPhase('done');
+      setWinner(playerScore > botScore ? 'player' : playerScore < botScore ? 'bot' : 'draw');
+    }
+  }, [cards, phase, playerScore, botScore]);
+
+  const flip = (uid) => {
+    if (phase !== 'player') return;
+    if (selected.length === 2) return;
+    const card = cards.find(c => c.uid === uid);
+    if (!card || card.flipped || card.matched) return;
+
+    // Adicionar à memória do bot
+    setBotMemory(m => ({ ...m, [uid]: card.emoji }));
+
+    const newCards = cards.map(c => c.uid === uid ? { ...c, flipped: true } : c);
+    setCards(newCards);
+    const newSel = [...selected, uid];
+    setSelected(newSel);
+
+    if (newSel.length === 2) {
+      setMoves(m => m + 1);
+      const [a, b] = newSel.map(id => newCards.find(c => c.uid === id));
+      if (a.emoji === b.emoji) {
+        // Par do jogador
+        setTimeout(() => {
+          setCards(prev => prev.map(c => newSel.includes(c.uid) ? { ...c, matched: true, matchedBy: 'player' } : c));
+          setSelected([]);
+          // Bot joga depois
+          setTimeout(() => setPhase('bot'), 400);
+        }, 600);
+      } else {
+        // Errou — vira de volta
+        setTimeout(() => {
+          setCards(prev => prev.map(c => newSel.includes(c.uid) ? { ...c, flipped: false } : c));
+          setSelected([]);
+          setTimeout(() => setPhase('bot'), 400);
+        }, 800);
+      }
+    }
+  };
+
+  // Turno do bot
+  useEffect(() => {
+    if (phase !== 'bot') return;
+    const unmatched = cards.filter(c => !c.matched);
+    if (unmatched.length === 0) return;
+
+    timerRef.current = setTimeout(() => {
+      setBotMoves(m => m + 1);
+      // Bot tenta usar memória (70% acerto)
+      let pair = null;
+      const botKnows = Object.entries(botMemory).filter(([uid]) => {
+        const c = cards.find(c => c.uid === Number(uid));
+        return c && !c.matched && !c.flipped;
+      });
+
+      // Agrupar por emoji
+      const byEmoji = {};
+      botKnows.forEach(([uid, em]) => {
+        if (!byEmoji[em]) byEmoji[em] = [];
+        byEmoji[em].push(Number(uid));
+      });
+      const knownPair = Object.values(byEmoji).find(ids => ids.length >= 2);
+
+      if (knownPair && Math.random() < 0.7) {
+        pair = [knownPair[0], knownPair[1]];
+      } else {
+        // Chute aleatório
+        const shuffled = [...unmatched].sort(() => Math.random() - 0.5);
+        pair = [shuffled[0].uid, shuffled[1]?.uid];
+      }
+
+      if (!pair || pair[1] == null) { setPhase('player'); return; }
+
+      const [fid, sid] = pair;
+
+      // Revelar primeira carta
+      setCards(prev => prev.map(c => c.uid === fid ? { ...c, flipped: true } : c));
+      setBotMemory(m => {
+        const first = cards.find(c => c.uid === fid);
+        return first ? { ...m, [fid]: first.emoji } : m;
+      });
+
+      setTimeout(() => {
+        // Revelar segunda carta
+        setCards(prev => prev.map(c => c.uid === sid ? { ...c, flipped: true } : c));
+        const cFirst = cards.find(c => c.uid === fid);
+        const cSec   = cards.find(c => c.uid === sid);
+        setBotMemory(m => cSec ? { ...m, [sid]: cSec.emoji } : m);
+
+        setTimeout(() => {
+          if (cFirst && cSec && cFirst.emoji === cSec.emoji) {
+            setCards(prev => prev.map(c => [fid, sid].includes(c.uid) ? { ...c, matched: true, matchedBy: 'bot' } : c));
+            setTimeout(() => setPhase('player'), 400);
+          } else {
+            setCards(prev => prev.map(c => [fid, sid].includes(c.uid) ? { ...c, flipped: false } : c));
+            setTimeout(() => setPhase('player'), 600);
+          }
+        }, 700);
+      }, 700);
+    }, 900);
+
+    return () => clearTimeout(timerRef.current);
+  }, [phase]);
+
+  const restart = () => {
+    setCards(makeDeck());
+    setSelected([]);
+    setMoves(0);
+    setBotMoves(0);
+    setPhase('player');
+    setBotMemory({});
+    setWinner(null);
+  };
+
+  if (phase === 'done') {
+    return (
+      <div className="text-center space-y-4 py-8">
+        <div className="text-7xl">{winner === 'player' ? '🏆' : winner === 'draw' ? '🤝' : '🤖'}</div>
+        <h3 className="font-heading font-black text-2xl">
+          {winner === 'player' ? 'Você ganhou!' : winner === 'draw' ? 'Empate!' : 'Bot ganhou!'}
+        </h3>
+        <div className="flex justify-center gap-8 text-lg font-bold">
+          <div><span className="text-primary">{playerScore}</span> <span className="text-xs text-muted-foreground block">Você</span></div>
+          <div><span className="text-red-500">{botScore}</span> <span className="text-xs text-muted-foreground block">Bot</span></div>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={restart} className="flex-1 py-3 bg-primary text-white font-bold rounded-2xl">Jogar de novo</button>
+          <button onClick={onClose} className="flex-1 py-3 bg-muted font-bold rounded-2xl">Voltar</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Placar */}
+      <div className="flex items-center justify-between bg-muted/40 rounded-xl px-4 py-2">
+        <div className="text-center">
+          <div className="font-black text-xl text-primary">{playerScore}</div>
+          <div className="text-[10px] text-muted-foreground">Você</div>
+        </div>
+        <div className="text-center">
+          <div className="text-xs font-bold">{phase === 'player' ? '🟢 Sua vez' : '🔴 Bot jogando...'}</div>
+          <div className="text-[10px] text-muted-foreground">{totalPairs - playerScore - botScore} pares restantes</div>
+        </div>
+        <div className="text-center">
+          <div className="font-black text-xl text-red-500">{botScore}</div>
+          <div className="text-[10px] text-muted-foreground">Bot</div>
+        </div>
+      </div>
+
+      {/* Grid de cartas */}
+      <div className="grid grid-cols-4 gap-2">
+        {cards.map((card) => (
+          <motion.button
+            key={card.uid}
+            whileTap={{ scale: 0.93 }}
+            onClick={() => flip(card.uid)}
+            disabled={card.matched || card.flipped || phase !== 'player'}
+            className={`aspect-square rounded-2xl flex items-center justify-center text-2xl border-2 transition-all ${
+              card.matched
+                ? card.matchedBy === 'player'
+                  ? 'bg-primary/20 border-primary'
+                  : 'bg-red-100 border-red-300'
+                : card.flipped
+                  ? 'bg-white border-primary shadow-lg'
+                  : 'bg-gradient-to-br from-purple-400 to-indigo-500 border-transparent cursor-pointer'
+            }`}
+          >
+            {card.flipped || card.matched ? (
+              <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }}>
+                {card.emoji}
+              </motion.span>
+            ) : (
+              <span className="text-white font-bold text-lg">?</span>
+            )}
+          </motion.button>
+        ))}
+      </div>
+
+      <button onClick={restart} className="w-full py-2 bg-muted rounded-xl text-sm font-bold">🔄 Reiniciar</button>
+    </div>
+  );
+}
+
 function EmotionsGrid({ onBack, onComplete }) {
   const [selected, setSelected] = useState(null);
   const [learned, setLearned] = useState([]);
   const [showQuiz, setShowQuiz] = useState(false);
+  const [showMemory, setShowMemory] = useState(false);
   const [quizIdx, setQuizIdx] = useState(0);
   const [quizScore, setQuizScore] = useState(0);
   const [quizDone, setQuizDone] = useState(false);
@@ -128,6 +344,16 @@ function EmotionsGrid({ onBack, onComplete }) {
   const markLearned = (idx) => {
     if (!learned.includes(idx)) setLearned(l => [...l, idx]);
   };
+
+  if (showMemory) {
+    return (
+      <div className="space-y-3">
+        <button onClick={() => setShowMemory(false)} className="flex items-center gap-2 text-muted-foreground text-sm">← Voltar</button>
+        <h3 className="font-heading font-bold text-lg text-center">🎴 Memória das Emoções</h3>
+        <EmotionMemoryGame onClose={() => setShowMemory(false)} />
+      </div>
+    );
+  }
 
   if (showQuiz) {
     if (quizDone) {
@@ -218,7 +444,10 @@ function EmotionsGrid({ onBack, onComplete }) {
       </AnimatePresence>
 
       {learned.length >= 10 && (
-        <button onClick={() => setShowQuiz(true)} className="w-full py-3 bg-primary text-primary-foreground rounded-2xl font-heading font-bold">🧠 Testar conhecimento</button>
+        <div className="flex gap-2">
+          <button onClick={() => setShowMemory(true)} className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-bold rounded-2xl">🎴 Jogo de Memória</button>
+          <button onClick={() => setShowQuiz(true)} className="flex-1 py-3 bg-primary text-primary-foreground rounded-2xl font-bold">🧠 Quiz</button>
+        </div>
       )}
       {learned.length < 10 && (
         <p className="text-center text-xs text-muted-foreground">Conheça {10 - learned.length} emoções ainda para desbloquear o quiz</p>

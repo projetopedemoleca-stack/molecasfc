@@ -318,10 +318,40 @@ export const ACHIEVEMENTS = [
 ];
 
 // ─── BOT ──────────────────────────────────────────────────────
+// Probabilidades de vitória do jogador (silenciosas):
+// easy=60%, medium=50%, hard=40%
 export function botAction(difficulty = 'medium') {
   const actions = ['pass', 'dribble', 'shoot'];
-  if (difficulty === 'easy') return actions[Math.floor(Math.random() * actions.length)];
-  if (difficulty === 'hard') return Math.random() < 0.5 ? 'shoot' : actions[Math.floor(Math.random() * actions.length)];
+  const winsAgainst = { pass: 'shoot', shoot: 'dribble', dribble: 'pass' };
+
+  // Escolhe uma ação do jogador aleatória para simular
+  // e ajusta a chance do bot "errar" conforme dificuldade
+  const r = Math.random();
+
+  if (difficulty === 'easy') {
+    // Bot erra 60% das vezes → jogador ganha ~60%
+    if (r < 0.60) {
+      // Bot escolhe ação perdedora intencionalmente
+      const playerFavorite = actions[Math.floor(Math.random() * actions.length)];
+      return winsAgainst[playerFavorite]; // ação que perde para playerFavorite
+    }
+    return actions[Math.floor(Math.random() * actions.length)];
+  }
+
+  if (difficulty === 'hard') {
+    // Bot erra apenas 40% das vezes → jogador ganha ~40%
+    if (r < 0.40) {
+      const playerFavorite = actions[Math.floor(Math.random() * actions.length)];
+      return winsAgainst[playerFavorite];
+    }
+    return actions[Math.floor(Math.random() * actions.length)];
+  }
+
+  // medium: bot erra 50% → jogador ganha ~50%
+  if (r < 0.50) {
+    const playerFavorite = actions[Math.floor(Math.random() * actions.length)];
+    return winsAgainst[playerFavorite];
+  }
   return actions[Math.floor(Math.random() * actions.length)];
 }
 

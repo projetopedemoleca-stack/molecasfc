@@ -17,10 +17,10 @@ const BOBINHO_R = 22;
 const BALL_R = 10;
 
 const PHASES = [
-  { id: 1, players: 2, bobinhos: 1, label: '2 vs 1', time: 30, desc: 'Dois jogadores contra 1 bobinho' },
-  { id: 2, players: 3, bobinhos: 1, label: '3 vs 1', time: 35, desc: 'Três jogadores contra 1 bobinho' },
-  { id: 3, players: 4, bobinhos: 1, label: '4 vs 1', time: 40, desc: 'Quatro jogadores contra 1 bobinho' },
-  { id: 4, players: 5, bobinhos: 2, label: '5 vs 2', time: 45, desc: 'Cinco jogadores contra 2 bobinhos!' },
+  { id: 1, players: 2, bobinhos: 1, label: '2 vs 1', time: 45, bobSpeed: 1.0, aiSpeed: 1.0, desc: 'Dois jogadores — bem fácil!' },
+  { id: 2, players: 3, bobinhos: 1, label: '3 vs 1', time: 50, bobSpeed: 1.4, aiSpeed: 1.2, desc: 'Três jogadores — tranquilo!' },
+  { id: 3, players: 4, bobinhos: 1, label: '4 vs 1', time: 55, bobSpeed: 1.8, aiSpeed: 1.5, desc: 'Quatro — o bobinho tá mais rápido!' },
+  { id: 4, players: 5, bobinhos: 2, label: '5 vs 2', time: 60, bobSpeed: 2.2, aiSpeed: 1.8, desc: 'Cinco jogadores, 2 bobinhos — caos!' },
 ];
 
 const PLAYER_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899', '#8b5cf6'];
@@ -132,18 +132,15 @@ export default function BobinhoGame() {
           const updated = [...prev];
           updated.forEach((p, i) => {
             if (i !== selectedPlayer && i !== ballHolder) {
-              // Fugir do bobinho mais próximo
               const nearestBobinho = bobinhos.reduce((closest, b) => {
                 const d = dist(p, b);
                 return d < dist(p, closest) ? b : closest;
               }, bobinhos[0]);
-              
               const dx = p.x - nearestBobinho.x;
               const dy = p.y - nearestBobinho.y;
               const d = Math.sqrt(dx * dx + dy * dy) || 1;
-              const speed = 1.5;
-              
-              if (dist(p, nearestBobinho) < 100) {
+              const speed = config.aiSpeed;
+              if (dist(p, nearestBobinho) < 120) {
                 p.x = clamp(p.x + (dx / d) * speed, PLAYER_R, FIELD_W - PLAYER_R);
                 p.y = clamp(p.y + (dy / d) * speed, PLAYER_R, FIELD_H - PLAYER_R);
               }
@@ -156,20 +153,11 @@ export default function BobinhoGame() {
       // IA do bobinho
       setBobinhos(prev => {
         return prev.map(b => {
-          let target;
-          if (role === 'bobinho') {
-            // Se você é bobinho, persegue quem tem a bola
-            target = players[ballHolder];
-          } else {
-            // Bobinho persegue quem tem a bola
-            target = players[ballHolder];
-          }
-          
+          const target = players[ballHolder];
           const dx = target.x - b.x;
           const dy = target.y - b.y;
           const d = Math.sqrt(dx * dx + dy * dy) || 1;
-          const speed = role === 'bobinho' && bobinhos.findIndex(bb => bb.id === b.id) === 0 ? 2.5 : 2;
-          
+          const speed = config.bobSpeed;
           return {
             ...b,
             x: clamp(b.x + (dx / d) * speed, BOBINHO_R, FIELD_W - BOBINHO_R),

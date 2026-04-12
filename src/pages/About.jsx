@@ -25,7 +25,7 @@ export default function About() {
           className="bg-gradient-to-br from-primary/20 to-accent/10 border border-primary/20 rounded-3xl p-5 text-center">
           <span className="text-5xl block mb-2">⚽</span>
           <h2 className="font-heading font-bold text-2xl text-foreground">Molecas FC</h2>
-          <p className="text-xs text-muted-foreground mt-1">Futebol · Estratégia · Inclusão · Diversão</p>
+          <p className="text-xs text-muted-foreground mt-1">Inclusão · Diversão · Saúde · Educação</p>
           <div className="mt-3 inline-block bg-primary/15 text-primary text-xs font-bold px-3 py-1 rounded-full">
             Versão {VERSION}
           </div>
@@ -58,7 +58,7 @@ export default function About() {
                 <circle cx="11" cy="22" r="5" fill="#3d1c02"/>
                 <circle cx="37" cy="22" r="5" fill="#3d1c02"/>
                 {/* pele morena clara */}
-                <ellipse cx="24" cy="27" rx="11" ry="13" fill="#D4956A"/>
+                <ellipse cx="24" cy="27" rx="11" ry="13" fill="#DBA878"/>
                 {/* olhos */}
                 <ellipse cx="20" cy="25" rx="1.5" ry="1.8" fill="#3d1c02"/>
                 <ellipse cx="28" cy="25" rx="1.5" ry="1.8" fill="#3d1c02"/>
@@ -68,7 +68,8 @@ export default function About() {
             </div>
             <div>
               <p className="font-heading font-bold text-base">Leidi Souza</p>
-              <p className="text-xs text-muted-foreground">Criadora e idealizadora do projeto</p>
+              <p className="text-xs text-muted-foreground">Profissional de Educação Física</p>
+              <p className="text-xs text-muted-foreground">CREF 168334-G/SP</p>
             </div>
           </div>
         </motion.div>
@@ -83,7 +84,7 @@ export default function About() {
             </div>
             <div>
               <p className="font-heading font-bold text-base">Elânia Francisca</p>
-              <p className="text-xs text-muted-foreground">Colaboradora do projeto</p>
+              <p className="text-xs text-muted-foreground">Psicóloga CRP 06/114296</p>
             </div>
           </div>
         </motion.div>
@@ -96,9 +97,9 @@ export default function About() {
             {[
               { icon: '🤝', label: 'Inclusão' },
               { icon: '💪', label: 'Cooperação' },
-              { icon: '🧠', label: 'Estratégia' },
               { icon: '🌈', label: 'Diversidade' },
-              { icon: '⚽', label: 'Futebol' },
+              { icon: '💜', label: 'Saúde' },
+              { icon: '📚', label: 'Educação' },
               { icon: '🌟', label: 'Diversão' },
             ].map(v => (
               <div key={v.label} className="flex items-center gap-2 bg-muted/50 rounded-xl px-3 py-2">

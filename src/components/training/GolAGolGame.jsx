@@ -11,17 +11,17 @@ import { audio } from '@/lib/audioEngine';
 
 const FIELD_W = 360;
 const FIELD_H = 480;
-const GOAL_W = 140;
-const GOAL_H = 80;
+const GOAL_W  = 180; // gol maior
+const GOAL_H  = 90;
 const PLAYER_R = 28;
-const BALL_R = 12;
+const BALL_R   = 12;
 
 const LEVELS = [
-  { label: 'Nível 1', rounds: 3, keeperSpeed: 2.0, botAccuracy: 0.3, desc: 'Goleiro lento, bot erra muito' },
-  { label: 'Nível 2', rounds: 4, keeperSpeed: 2.8, botAccuracy: 0.4, desc: 'Goleiro mais rápido' },
-  { label: 'Nível 3', rounds: 5, keeperSpeed: 3.5, botAccuracy: 0.5, desc: 'Bot mais preciso' },
-  { label: 'Nível 4', rounds: 5, keeperSpeed: 4.2, botAccuracy: 0.6, desc: 'Difícil!' },
-  { label: 'Nível 5', rounds: 6, keeperSpeed: 5.0, botAccuracy: 0.7, desc: 'Modo pro!' },
+  { label: 'Nível 1 ⭐',    rounds: 3, keeperSpeed: 1.5, botAccuracy: 0.25, desc: 'Goleiro muito lento — bot quase sempre erra' },
+  { label: 'Nível 2 ⭐⭐',   rounds: 4, keeperSpeed: 2.2, botAccuracy: 0.35, desc: 'Goleiro lento — boa chance de gol!' },
+  { label: 'Nível 3 ⭐⭐⭐',  rounds: 5, keeperSpeed: 3.0, botAccuracy: 0.50, desc: 'Goleiro médio — igualdade' },
+  { label: 'Nível 4 ⭐⭐⭐⭐', rounds: 5, keeperSpeed: 4.0, botAccuracy: 0.62, desc: 'Goleiro rápido — difícil!' },
+  { label: 'Nível 5 🔥',    rounds: 6, keeperSpeed: 5.2, botAccuracy: 0.75, desc: 'Goleiro pro — modo mestre!' },
 ];
 
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
@@ -246,28 +246,32 @@ export default function GolAGolGame() {
 
   if (phase === 'menu') {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[80vh] gap-6 px-4">
+      <div className="flex flex-col items-center justify-center min-h-[80vh] gap-5 px-4">
         <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center">
           <motion.div animate={{ y: [0, -10, 0], rotate: [0, 5, -5, 0] }} transition={{ duration: 2, repeat: Infinity }} className="text-6xl mb-2">⚽</motion.div>
           <h1 className="font-heading font-black text-3xl text-primary mb-1">Gol a Gol</h1>
           <p className="text-gray-500 text-sm px-8 text-center">Use o joystick para mirar e chute no momento certo!</p>
         </motion.div>
-        
-        <div className="bg-card rounded-2xl p-4 w-full max-w-xs">
-          <p className="text-xs text-muted-foreground mb-2">Como jogar:</p>
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center gap-2">
-              <Target className="w-4 h-4 text-blue-500" />
-              <span>Use o joystick para mirar</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Shield className="w-4 h-4 text-yellow-500" />
-              <span>Quando for goleiro, toque para se mover</span>
-            </div>
+
+        <div className="w-full max-w-xs">
+          <p className="text-xs font-bold text-gray-500 mb-2 uppercase">Escolha o nível</p>
+          <div className="space-y-2">
+            {LEVELS.map((lv, i) => (
+              <motion.button
+                key={i}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => initLevel(i)}
+                className="w-full py-3 px-4 rounded-2xl bg-card border-2 border-border/30 hover:border-primary text-left flex justify-between items-center transition-all"
+              >
+                <div>
+                  <div className="font-bold text-sm">{lv.label}</div>
+                  <div className="text-[10px] text-muted-foreground">{lv.desc}</div>
+                </div>
+                <span className="text-xl">→</span>
+              </motion.button>
+            ))}
           </div>
         </div>
-        
-        <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => initLevel(0)} className="w-full max-w-xs py-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold rounded-2xl shadow-lg text-lg">Começar ⚽</motion.button>
       </div>
     );
   }

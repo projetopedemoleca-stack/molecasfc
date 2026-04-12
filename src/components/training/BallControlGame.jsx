@@ -14,6 +14,14 @@ const LANES = [50, 150, 250];
 const getSpeed = (lvl) => 2.2 + lvl * 0.42;
 const getSpawn = (lvl) => Math.max(1600 - lvl * 100, 550);
 
+const DIFFICULTY_LEVELS = [
+  { label: 'Nível 1 ⭐',    internalLvl: 0, desc: 'Poucas defensoras, bem lento — ideal pra começar!' },
+  { label: 'Nível 2 ⭐⭐',   internalLvl: 2, desc: 'Ritmo moderado — bom desafio!' },
+  { label: 'Nível 3 ⭐⭐⭐',  internalLvl: 4, desc: 'Defensoras mais rápidas e frequentes.' },
+  { label: 'Nível 4 ⭐⭐⭐⭐', internalLvl: 6, desc: 'Difícil! Duas faixas bloqueadas às vezes.' },
+  { label: 'Nível 5 🔥',    internalLvl: 9, desc: 'Modo pro — reflexos de elite!' },
+];
+
 // Cores dos obstáculos por tipo
 const OBS_COLORS = ['#ef4444','#f97316','#ec4899','#8b5cf6'];
 const OBS_EMOJIS = ['👟','⚡','🦵','💨'];
@@ -25,7 +33,7 @@ export default function BallControlGame() {
   const [lane, setLane] = useState(1);
   const [obstacles, setObstacles] = useState([]);
   const [score, setScore] = useState(0);
-  const [phase, setPhase] = useState('idle'); // idle | running | crashed
+  const [phase, setPhase] = useState('menu'); // menu | idle | running | crashed
   const [lastScore, setLastScore] = useState(0);
   const [goldenReward, setGoldenReward] = useState(null);
   const [crashPos, setCrashPos] = useState(null);
@@ -132,16 +140,45 @@ export default function BallControlGame() {
 
   return (
     <div className="space-y-3">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="font-heading font-bold text-xl">🏃‍♀️ Condução de Bola</p>
-          <p className="text-xs text-muted-foreground">
-            {level < 4 ? 'Mude de faixa para desviar!' : level < 7 ? 'Mais defensoras!' : '🔥 Duas faixas bloqueadas!'}
-          </p>
+
+      {/* Menu de seleção de nível */}
+      {phase === 'menu' && (
+        <div className="flex flex-col items-center gap-5 py-4">
+          <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center">
+            <motion.div animate={{ y: [0,-10,0] }} transition={{ duration: 1.8, repeat: Infinity }} className="text-5xl mb-2">⚽</motion.div>
+            <h1 className="font-heading font-black text-2xl text-primary mb-1">Condução de Bola</h1>
+            <p className="text-xs text-muted-foreground px-6">Desvie das defensoras mudando de faixa!</p>
+          </motion.div>
+          <div className="w-full max-w-xs space-y-2">
+            <p className="text-xs font-bold text-gray-500 mb-1 uppercase">Escolha a dificuldade</p>
+            {DIFFICULTY_LEVELS.map((dl, i) => (
+              <motion.button key={i} whileTap={{ scale: 0.97 }}
+                onClick={() => { setLevel(dl.internalLvl); setPhase('idle'); }}
+                className="w-full py-3 px-4 rounded-2xl bg-card border-2 border-border/30 hover:border-primary text-left flex justify-between items-center transition-all">
+                <div>
+                  <div className="font-bold text-sm">{dl.label}</div>
+                  <div className="text-[10px] text-muted-foreground">{dl.desc}</div>
+                </div>
+                <span className="text-xl">→</span>
+              </motion.button>
+            ))}
+          </div>
         </div>
-        <LevelBadge level={level} />
-      </div>
+      )}
+
+      {/* Campo + controles (visível fora do menu) */}
+      {phase !== 'menu' && (
+        <div className="space-y-3">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-heading font-bold text-xl">🏃‍♀️ Condução de Bola</p>
+            <p className="text-xs text-muted-foreground">
+              {level < 4 ? 'Mude de faixa para desviar!' : level < 7 ? 'Mais defensoras!' : '🔥 Duas faixas bloqueadas!'}
+            </p>
+          </div>
+          <LevelBadge level={level} />
+        </div>
 
       {/* Placar */}
       <div className="flex items-center justify-between px-2">
@@ -289,6 +326,8 @@ export default function BallControlGame() {
             <RotateCcw className="w-4 h-4"/> Tentar Novamente
           </button>
         </motion.div>
+      )}
+        </div>
       )}
     </div>
   );
