@@ -11,24 +11,27 @@ import { audio } from '@/lib/audioEngine';
 
 const FIELD_W = 360;
 const FIELD_H = 480;
-const GOAL_W  = 180; // gol maior
-const GOAL_H  = 90;
+const GOAL_W  = 220; // gol maior
+const GOAL_H  = 100;
 const PLAYER_R = 28;
 const BALL_R   = 12;
 
-const LEVELS = [
-  { label: 'Nível 1 ⭐',    rounds: 3, keeperSpeed: 1.5, botAccuracy: 0.25, desc: 'Goleiro muito lento — bot quase sempre erra' },
-  { label: 'Nível 2 ⭐⭐',   rounds: 4, keeperSpeed: 2.2, botAccuracy: 0.35, desc: 'Goleiro lento — boa chance de gol!' },
-  { label: 'Nível 3 ⭐⭐⭐',  rounds: 5, keeperSpeed: 3.0, botAccuracy: 0.50, desc: 'Goleiro médio — igualdade' },
-  { label: 'Nível 4 ⭐⭐⭐⭐', rounds: 5, keeperSpeed: 4.0, botAccuracy: 0.62, desc: 'Goleiro rápido — difícil!' },
-  { label: 'Nível 5 🔥',    rounds: 6, keeperSpeed: 5.2, botAccuracy: 0.75, desc: 'Goleiro pro — modo mestre!' },
-];
+// Progressão automática de nível
+function getLevelConfig(lvl) {
+  return {
+    label: `Nível ${lvl + 1}`,
+    rounds: 3 + Math.floor(lvl / 2),
+    keeperSpeed: 1.2 + lvl * 0.5,
+    botAccuracy: 0.2 + lvl * 0.08,
+  };
+}
+const MAX_LEVEL = 8;
 
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 function dist(a, b) { return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2); }
 
 export default function GolAGolGame() {
-  const [phase, setPhase] = useState('menu');
+  const [phase, setPhase] = useState('starting');
   const [level, setLevel] = useState(0);
   const [score, setScore] = useState({ player: 0, bot: 0 });
   const [round, setRound] = useState(1);
@@ -45,7 +48,7 @@ export default function GolAGolGame() {
   const [ballTrail, setBallTrail] = useState([]);
   const [defenderTouch, setDefenderTouch] = useState({ x: null, y: null });
 
-  const config = LEVELS[level] || LEVELS[0];
+  const config = getLevelConfig(level);
   const rafRef = useRef(null);
   const aimRef = useRef(null);
 
@@ -53,7 +56,7 @@ export default function GolAGolGame() {
     if (soundEnabled) audio.play?.(sound);
   };
 
-  const initLevel = useCallback((lvl) => {
+  const initLevel = useCallback((lvl = 0) => {
     setLevel(lvl);
     setScore({ player: 0, bot: 0 });
     setRound(1);
@@ -62,8 +65,9 @@ export default function GolAGolGame() {
     setPhase('playing');
     setAimAngle(-Math.PI / 2);
     setAimPower(50);
-    playSound('start');
   }, []);
+
+  useEffect(() => { initLevel(0); }, []);
 
   const resetPositions = (who) => {
     setBallPos({ x: FIELD_W / 2, y: who === 'player' ? FIELD_H - 100 : 100 });
@@ -151,7 +155,7 @@ export default function GolAGolGame() {
               round >= config.rounds) {
             if (newScore.player > newScore.bot) {
               const nextLvl = level + 1;
-              if (nextLvl >= LEVELS.length) {
+              if (nextLvl >= MAX_LEVEL) {
                 setPhase('victory');
                 playSound('victory');
               } else {
@@ -244,34 +248,11 @@ export default function GolAGolGame() {
     handleDefendMove(t.clientX);
   };
 
-  if (phase === 'menu') {
+  if (phase === 'starting') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[80vh] gap-5 px-4">
-        <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center">
-          <motion.div animate={{ y: [0, -10, 0], rotate: [0, 5, -5, 0] }} transition={{ duration: 2, repeat: Infinity }} className="text-6xl mb-2">⚽</motion.div>
-          <h1 className="font-heading font-black text-3xl text-primary mb-1">Gol a Gol</h1>
-          <p className="text-gray-500 text-sm px-8 text-center">Use o joystick para mirar e chute no momento certo!</p>
-        </motion.div>
-
-        <div className="w-full max-w-xs">
-          <p className="text-xs font-bold text-gray-500 mb-2 uppercase">Escolha o nível</p>
-          <div className="space-y-2">
-            {LEVELS.map((lv, i) => (
-              <motion.button
-                key={i}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => initLevel(i)}
-                className="w-full py-3 px-4 rounded-2xl bg-card border-2 border-border/30 hover:border-primary text-left flex justify-between items-center transition-all"
-              >
-                <div>
-                  <div className="font-bold text-sm">{lv.label}</div>
-                  <div className="text-[10px] text-muted-foreground">{lv.desc}</div>
-                </div>
-                <span className="text-xl">→</span>
-              </motion.button>
-            ))}
-          </div>
-        </div>
+        <motion.div animate={{ rotate: 360 }} transition={{ duration: 1 }} className="text-6xl">⚽</motion.div>
+        <p className="text-gray-500 text-sm">Carregando...</p>
       </div>
     );
   }
@@ -285,7 +266,7 @@ export default function GolAGolGame() {
           <div className="text-4xl font-bold text-gray-700">{score.player} x {score.bot}</div>
         </motion.div>
         <div className="flex gap-3 w-full max-w-xs">
-          <motion.button whileTap={{ scale: 0.95 }} onClick={() => setPhase('menu')} className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl">Menu</motion.button>
+          <motion.button whileTap={{ scale: 0.95 }} onClick={() => initLevel(0)} className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl">Recomeçar</motion.button>
           <motion.button whileTap={{ scale: 0.95 }} onClick={() => initLevel(0)} className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold rounded-xl shadow-lg">Novamente</motion.button>
         </div>
       </div>
@@ -371,7 +352,7 @@ export default function GolAGolGame() {
 
         {/* Goleira */}
         <motion.div className="absolute z-10" style={{ left: keeperPos.x - PLAYER_R, top: keeperPos.y - PLAYER_R }} animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 0.5, repeat: Infinity }}>
-          <div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl shadow-lg border-2 border-white" style={{ background: turn === 'player' ? 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)' : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' }}>{turn === 'player' ? '🤖' : '🧤'}</div>
+          <div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl shadow-lg border-2 border-white" style={{ background: turn === 'player' ? 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)' : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' }}>{turn === 'player' ? '👩' : '👧'}</div>
         </motion.div>
 
         {/* Bola */}
@@ -442,13 +423,18 @@ export default function GolAGolGame() {
           </motion.button>
         </div>
       ) : turn === 'bot' && phase === 'shooting' ? (
-        <div className="flex items-center gap-4">
-          <p className="text-sm text-gray-500 text-center">
-            🧤 Toque na tela para mover o goleiro e defender!
-          </p>
-          <button onClick={() => setSoundEnabled(!soundEnabled)} className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors">
-            {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-          </button>
+        <div className="flex flex-col items-center gap-2 w-full max-w-sm">
+          <p className="text-xs text-gray-500 font-bold">⬅️ Arraste para defender ➡️</p>
+          <div
+            className="w-full h-16 rounded-2xl bg-gradient-to-r from-yellow-400/30 to-yellow-600/30 border-2 border-yellow-400 flex items-center justify-center cursor-ew-resize select-none relative overflow-hidden"
+            onTouchStart={(e) => { e.preventDefault(); handleDefendMove(e.touches[0].clientX); }}
+            onTouchMove={(e) => { e.preventDefault(); handleDefendMove(e.touches[0].clientX); }}
+            onMouseDown={(e) => handleDefendMove(e.clientX)}
+            onMouseMove={(e) => e.buttons === 1 && handleDefendMove(e.clientX)}
+          >
+            <motion.div animate={{ x: [0, 10, -10, 0] }} transition={{ duration: 0.5, repeat: Infinity }} className="text-3xl">🧤</motion.div>
+            <span className="text-xs text-yellow-700 font-bold ml-2">Deslize para defender!</span>
+          </div>
         </div>
       ) : (
         <div className="flex items-center gap-4">

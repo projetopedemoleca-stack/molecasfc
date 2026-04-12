@@ -17,10 +17,10 @@ const BOBINHO_R = 22;
 const BALL_R = 10;
 
 const PHASES = [
-  { id: 1, players: 2, bobinhos: 1, label: '2 vs 1', time: 45, bobSpeed: 1.0, aiSpeed: 1.0, desc: 'Dois jogadores — bem fácil!' },
-  { id: 2, players: 3, bobinhos: 1, label: '3 vs 1', time: 50, bobSpeed: 1.4, aiSpeed: 1.2, desc: 'Três jogadores — tranquilo!' },
-  { id: 3, players: 4, bobinhos: 1, label: '4 vs 1', time: 55, bobSpeed: 1.8, aiSpeed: 1.5, desc: 'Quatro — o bobinho tá mais rápido!' },
-  { id: 4, players: 5, bobinhos: 2, label: '5 vs 2', time: 60, bobSpeed: 2.2, aiSpeed: 1.8, desc: 'Cinco jogadores, 2 bobinhos — caos!' },
+  { id: 1, players: 2, bobinhos: 1, label: '2 vs 1', time: 60, bobSpeed: 0.6, aiSpeed: 0.8, desc: 'Dois jogadores — bem fácil!' },
+  { id: 2, players: 3, bobinhos: 1, label: '3 vs 1', time: 70, bobSpeed: 0.9, aiSpeed: 1.0, desc: 'Três jogadores — tranquilo!' },
+  { id: 3, players: 4, bobinhos: 1, label: '4 vs 1', time: 80, bobSpeed: 1.2, aiSpeed: 1.2, desc: 'Quatro — o bobinho tá mais rápido!' },
+  { id: 4, players: 5, bobinhos: 2, label: '5 vs 2', time: 90, bobSpeed: 1.5, aiSpeed: 1.4, desc: 'Cinco jogadores, 2 bobinhos — caos!' },
 ];
 
 const PLAYER_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899', '#8b5cf6'];
@@ -197,6 +197,38 @@ export default function BobinhoGame() {
     }, 1000);
     return () => clearInterval(t);
   }, [phase]);
+
+  // Auto-passe inteligente dos bots
+  useEffect(() => {
+    if (phase !== 'playing') return;
+    if (ballHolder === selectedPlayer && role === 'player') return; // jogador controla manualmente
+
+    // Bot com a bola: passar para o jogador mais seguro após 1.5s
+    const t = setTimeout(() => {
+      if (phase !== 'playing') return;
+      if (players.length === 0 || bobinhos.length === 0) return;
+
+      // Encontrar jogador mais seguro (mais longe de todos os bobinhos)
+      let bestTarget = -1;
+      let bestDist = -1;
+      players.forEach((p, i) => {
+        if (i === ballHolder) return;
+        const minBobDist = bobinhos.reduce((minD, b) => Math.min(minD, dist(p, b)), Infinity);
+        if (minBobDist > bestDist) {
+          bestDist = minBobDist;
+          bestTarget = i;
+        }
+      });
+
+      if (bestTarget >= 0) {
+        setBallHolder(bestTarget);
+        setBallPos({ x: players[bestTarget].x, y: players[bestTarget].y });
+        setPasses(prev => prev + 1);
+      }
+    }, 1500 + Math.random() * 500);
+
+    return () => clearTimeout(t);
+  }, [ballHolder, phase]);
 
   // Passar a bola
   const passBall = (targetIdx) => {

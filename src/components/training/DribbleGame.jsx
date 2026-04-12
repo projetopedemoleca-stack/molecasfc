@@ -74,6 +74,7 @@ export default function DribbleGame() {
   const config = LEVELS[level] || LEVELS[0];
   const rafRef = useRef(null);
   const joyRef = useRef(null);
+  const joyCenterRef = useRef(null);
 
   const playSound = (sound) => {
     if (soundEnabled) audio.play?.(sound);
@@ -230,18 +231,24 @@ export default function DribbleGame() {
   const handleJoyStart = (clientX, clientY) => {
     if (!joyRef.current) return;
     const rect = joyRef.current.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    setJoystickCenter({ x: centerX, y: centerY });
-    setJoystick({ x: 0, y: 0, active: true });
-    updateJoystick(clientX, clientY);
+    const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    joyCenterRef.current = center;
+    setJoystickCenter(center);
+    const maxDist = 40;
+    const dx = clientX - center.x;
+    const dy = clientY - center.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const scale = Math.min(distance, maxDist) / maxDist;
+    const angle = Math.atan2(dy, dx);
+    setJoystick({ x: Math.cos(angle) * scale, y: Math.sin(angle) * scale, active: true });
   };
 
   const updateJoystick = (clientX, clientY) => {
-    if (!joystickCenter) return;
-    const maxDist = 35;
-    const dx = clientX - joystickCenter.x;
-    const dy = clientY - joystickCenter.y;
+    const center = joyCenterRef.current;
+    if (!center) return;
+    const maxDist = 40;
+    const dx = clientX - center.x;
+    const dy = clientY - center.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
     const scale = Math.min(distance, maxDist) / maxDist;
     const angle = Math.atan2(dy, dx);
@@ -258,6 +265,7 @@ export default function DribbleGame() {
   };
 
   const handleJoyEnd = () => {
+    joyCenterRef.current = null;
     setJoystick({ x: 0, y: 0, active: false });
     setJoystickCenter(null);
   };
@@ -654,7 +662,7 @@ export default function DribbleGame() {
         >
           <div
             ref={joyRef}
-            className="relative w-28 h-28 rounded-full bg-gray-200/60 border-2 border-gray-300 shadow-inner"
+            className="relative w-32 h-32 rounded-full bg-gray-200/60 border-2 border-gray-300 shadow-inner"
             onTouchStart={(e) => { e.preventDefault(); handleJoyStart(e.touches[0].clientX, e.touches[0].clientY); }}
             onTouchMove={(e) => { e.preventDefault(); handleJoyMove(e.touches[0].clientX, e.touches[0].clientY); }}
             onTouchEnd={(e) => { e.preventDefault(); handleJoyEnd(); }}

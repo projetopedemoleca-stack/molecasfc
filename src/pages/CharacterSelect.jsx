@@ -105,6 +105,8 @@ function ColorRow({ colors, value, onChange }) {
 export default function CharacterSelect() {
   const navigate = useNavigate();
   const profile = loadProfile();
+  const customPlayer = profile?.customPlayer;
+  const hasCustomPlayer = customPlayer?.playerName;
 
   const [selectedId, setSelectedId] = useState(profile.selectedPlayerId || 'luna');
   const [shirtColor, setShirtColor] = useState(profile.uniformColor || '#E91E63');
@@ -117,7 +119,9 @@ export default function CharacterSelect() {
   const globalLevel = globalLevelInfo.level;
   const globalXP = profile?.globalXP || 0;
 
-  const selected = PLAYERS.find(p => p.id === selectedId) || PLAYERS[0];
+  const selected = selectedId === 'custom'
+    ? { id: 'custom', name: customPlayer?.playerName || 'Minha Jogadora', avatar: customPlayer?.skinTone || '👧', position: 'Personalizada', hair: '', trait: 'Jogadora única!', favoriteAction: 'dribble', stats: { tecnica: 3, velocidade: 3, criatividade: 3, coletivo: 3, confianca: 3 }, inclusion: null }
+    : PLAYERS.find(p => p.id === selectedId) || PLAYERS[0];
 
   const handleConfirm = () => {
     audio.playSelect();
@@ -165,6 +169,34 @@ export default function CharacterSelect() {
           <motion.div key="player" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
             {/* Player grid */}
             <div className="grid grid-cols-5 gap-2 max-w-sm mx-auto mb-4">
+              {hasCustomPlayer && (
+                <motion.div
+                  key="custom"
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setSelectedId('custom')}
+                  className={`relative p-3 rounded-2xl border-2 cursor-pointer transition-all ${
+                    selectedId === 'custom'
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border/30 bg-card hover:border-primary/50'
+                  }`}
+                >
+                  <div className="text-center">
+                    <div className="text-3xl mb-1">
+                      {customPlayer.skinTone || '👧'}
+                    </div>
+                    <p className="font-bold text-xs truncate">{customPlayer.playerName}</p>
+                    <p className="text-[9px] text-muted-foreground">Minha Jogadora</p>
+                  </div>
+                  {selectedId === 'custom' && (
+                    <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                      <Check className="w-2.5 h-2.5 text-white" />
+                    </div>
+                  )}
+                  <div className="absolute -top-1 -left-1">
+                    <span className="text-[10px] bg-yellow-400 text-yellow-900 font-bold px-1 rounded-full">✨ Minha</span>
+                  </div>
+                </motion.div>
+              )}
               {PLAYERS.map(p => {
                 const unlocked = isPlayerUnlocked(p.id, profile);
                 return (
