@@ -34,10 +34,10 @@ const SPELLING_ROUNDS = 5;
 function loadProgress() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return { unlockedLevel: 1, earnedStickers: [] };
+    if (!stored) return { unlockedLevel: 1 };
     return JSON.parse(stored);
   }
-  catch { return { unlockedLevel: 1, earnedStickers: [] }; }
+  catch { return { unlockedLevel: 1 }; }
 }
 function saveProgress(data) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
@@ -394,7 +394,7 @@ export default function EnglishGame() {
         <h2 className="font-heading font-bold text-3xl">Inglês do Futebol</h2>
         <p className="text-xs text-muted-foreground mt-2">10 níveis de vocabulário + jogos interativos</p>
       </motion.div>
-      <ProgressBar value={progress.earnedStickers?.length || 0} max={50} color="bg-yellow-500" />
+      <ProgressBar value={progress.unlockedLevel - 1} max={10} color="bg-blue-500" />
       <div className="space-y-2">
         {LEVELS.map((lvl, i) => {
           const locked = i + 1 > progress.unlockedLevel;

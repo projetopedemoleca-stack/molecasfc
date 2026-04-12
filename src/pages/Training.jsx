@@ -40,8 +40,7 @@ class TrainingErrorBoundary extends React.Component {
 import PenaltyGame from '@/components/training/PenaltyGame';
 import PassGame from '@/components/training/PassGame';
 import DribbleGame from '@/components/training/DribbleGame';
-import DribbleGameV1 from '@/components/training/DribbleGameV1';
-import DribbleGameV2 from '@/components/training/DribbleGameV2';
+import GolAGolGame from '@/components/training/GolAGolGame';
 import BallControlGame from '@/components/training/BallControlGame';
 import PursuitGame from '@/components/training/PursuitGame';
 
@@ -58,9 +57,8 @@ import DiarioMenstrual from '@/components/training/DiarioMenstrual';
 const TRAINING_MODULES = [
   { id: 'penalty',       label: 'Penalti',             emoji: '⚽',  desc: 'Chute nos 9 quadrantes - engane a goleira!',   color: 'from-primary to-green-500',     component: PenaltyGame },
   { id: 'pass',          label: 'Passe',                emoji: '🎯',  desc: 'Reação e timing perfeito',                      color: 'from-blue-500 to-blue-600',      component: PassGame },
-  { id: 'dribble',       label: 'Fut de Rua Original',  emoji: '🥫',  desc: '1x1 na rua - escolha sua bola!',                color: 'from-amber-500 to-orange-600', component: DribbleGame },
-  { id: 'dribblev1',     label: 'Fut de Rua V1',        emoji: '⚽',  desc: 'Arraste para mirar e chutar!',                  color: 'from-green-500 to-teal-600',   component: DribbleGameV1 },
-  { id: 'dribblev2',     label: 'Fut de Rua V2',        emoji: '🎮',  desc: 'Joystick para fugir do marcador!',              color: 'from-orange-500 to-red-600',   component: DribbleGameV2 },
+  { id: 'dribble',       label: 'Fut de Rua',           emoji: '🥫',  desc: '1x1 na rua - escolha sua bola e fuja!',         color: 'from-amber-500 to-orange-600', component: DribbleGame },
+  { id: 'golagol',       label: 'Gol a Gol',            emoji: '⚽',  desc: 'Alterne chutes e defesas contra o bot!',        color: 'from-green-500 to-teal-600',   component: GolAGolGame },
   { id: 'control',       label: 'Condução',             emoji: '🏃‍♀️', desc: 'Desvie das defensoras e avance!',               color: 'from-teal-500 to-cyan-500',      component: BallControlGame },
   { id: 'pursuit',       label: 'Drible c/ Marcador',   emoji: '🔥',  desc: 'Fuja da marcadora e chegue ao gol!',            color: 'from-accent to-pink-500',        component: PursuitGame },
   { id: 'english',       label: 'Inglês do Futebol',    emoji: '🇺🇸', desc: '10 níveis · vocabulário · 50 figurinhas',       color: 'from-blue-600 to-indigo-700',    component: EnglishGame },
