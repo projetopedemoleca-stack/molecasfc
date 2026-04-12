@@ -23,6 +23,8 @@ const BALL_TYPES = [
   { id: 'bottle', name: 'Garrafinha',   emoji: '🍼', speed: 1.00, desc: 'Equilibrada' },
   { id: 'lemon',  name: 'Limão',        emoji: '🍋', speed: 1.00, desc: 'Irregular' },
   { id: 'cap',    name: 'Tampinha',    emoji: '🪙', speed: 1.05, desc: 'Muito leve' },
+  { id: 'tennis', name: 'Bolinha de Tênis', emoji: '🎾', speed: 1.15, desc: 'Muito rápida e quicante' },
+  { id: 'deflated', name: 'Bola Murcha', emoji: '🏀', speed: 0.70, desc: 'Lenta e imprevisível' },
 ];
 
 const OBSTACLE_TYPES = [
@@ -31,6 +33,7 @@ const OBSTACLE_TYPES = [
   { id: 'cat',  name: 'Gato',            emoji: '🐱', behavior: 'patrol', desc: 'Passeia pelo local' },
   { id: 'bike', name: 'Bicicleta',       emoji: '🚲', behavior: 'parked', desc: 'Estacionada no canto' },
   { id: 'bin',  name: 'Lixeira',         emoji: '🗑️', behavior: 'static', desc: 'Obstáculo fixo' },
+  { id: 'granny', name: 'Velhinha',      emoji: '👵', behavior: 'slow', desc: 'Anda devagar pela rua' },
 ];
 
 const LEVELS = [
@@ -139,6 +142,14 @@ export default function DribbleGame() {
           }
           return { ...obs, x: newX };
         }
+        if (obs.type.behavior === 'slow') {
+          // Velhinha anda devagar
+          let newX = obs.x + obs.dir * (obs.speed * 0.3);
+          if (newX < 30 || newX > FIELD_W - 30) {
+            return { ...obs, dir: -obs.dir };
+          }
+          return { ...obs, x: newX };
+        }
         return obs;
       }));
 
@@ -215,7 +226,7 @@ export default function DribbleGame() {
     return () => clearInterval(t);
   }, [phase]);
 
-  // Joystick handlers
+  // Joystick handlers melhorados
   const handleJoyStart = (clientX, clientY) => {
     if (!joyRef.current) return;
     const rect = joyRef.current.getBoundingClientRect();
@@ -223,11 +234,12 @@ export default function DribbleGame() {
     const centerY = rect.top + rect.height / 2;
     setJoystickCenter({ x: centerX, y: centerY });
     setJoystick({ x: 0, y: 0, active: true });
+    updateJoystick(clientX, clientY);
   };
 
-  const handleJoyMove = (clientX, clientY) => {
-    if (!joystick.active || !joystickCenter) return;
-    const maxDist = 40;
+  const updateJoystick = (clientX, clientY) => {
+    if (!joystickCenter) return;
+    const maxDist = 35;
     const dx = clientX - joystickCenter.x;
     const dy = clientY - joystickCenter.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
@@ -238,6 +250,11 @@ export default function DribbleGame() {
       y: Math.sin(angle) * scale,
       active: true,
     });
+  };
+
+  const handleJoyMove = (clientX, clientY) => {
+    if (!joystick.active) return;
+    updateJoystick(clientX, clientY);
   };
 
   const handleJoyEnd = () => {

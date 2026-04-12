@@ -42,7 +42,7 @@ import PassGame from '@/components/training/PassGame';
 import DribbleGame from '@/components/training/DribbleGame';
 import GolAGolGame from '@/components/training/GolAGolGame';
 import BallControlGame from '@/components/training/BallControlGame';
-import PursuitGame from '@/components/training/PursuitGame';
+import BobinhoGame from '@/components/training/BobinhoGame';
 
 // Módulos inativos (para lançamento futuro):
 // import EnglishGame from '@/components/training/EnglishGame';
@@ -60,7 +60,7 @@ const TRAINING_MODULES = [
   { id: 'dribble',       label: 'Fut de Rua',           emoji: '🥫',  desc: '1x1 na rua - escolha sua bola e fuja!',         color: 'from-amber-500 to-orange-600', component: DribbleGame },
   { id: 'golagol',       label: 'Gol a Gol',            emoji: '⚽',  desc: 'Alterne chutes e defesas contra o bot!',        color: 'from-green-500 to-teal-600',   component: GolAGolGame },
   { id: 'control',       label: 'Condução',             emoji: '🏃‍♀️', desc: 'Desvie das defensoras e avance!',               color: 'from-teal-500 to-cyan-500',      component: BallControlGame },
-  { id: 'pursuit',       label: 'Drible c/ Marcador',   emoji: '🔥',  desc: 'Fuja da marcadora e chegue ao gol!',            color: 'from-accent to-pink-500',        component: PursuitGame },
+  { id: 'bobinho',       label: 'Bobinho',              emoji: '🏃',  desc: 'Passe a bola antes que te peguem!',             color: 'from-accent to-pink-500',        component: BobinhoGame },
   // Módulos inativos (para lançamento futuro):
   // { id: 'english',       label: 'Inglês do Futebol',    emoji: '🇺🇸', desc: '10 níveis · vocabulário',                       color: 'from-blue-600 to-indigo-700',    component: EnglishGame },
   // { id: 'story',         label: 'Modo Carreira',        emoji: '👑',  desc: 'A jornada de uma jogadora!',                    color: 'from-rose-500 to-pink-600',      component: StoryGame },
