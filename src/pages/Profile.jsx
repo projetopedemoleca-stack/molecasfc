@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -8,41 +8,7 @@ import {
 } from 'lucide-react';
 import { loadProfile, saveProfile } from '@/lib/playerProfile';
 import { audio } from '@/lib/audioEngine';
-
-// ═══════════════════════════════════════════════════
-// DADOS DE CUSTOMIZAÇÃO
-// ═══════════════════════════════════════════════════
-
-const SKIN_TONES = [
-  { id: 's1', color: '#FDDBB4', label: 'Clara' },
-  { id: 's2', color: '#F0C27F', label: 'Média Clara' },
-  { id: 's3', color: '#D4915A', label: 'Média' },
-  { id: 's4', color: '#A0522D', label: 'Média Escura' },
-  { id: 's5', color: '#5C3317', label: 'Escura' },
-  { id: 's6', color: '#3B1F0A', label: 'Bem Escura' },
-];
-
-const HAIR_COLORS = [
-  { id: 'h1', color: '#1A1A1A', label: 'Preto' },
-  { id: 'h2', color: '#4A3728', label: 'Castanho Escuro' },
-  { id: 'h3', color: '#8B5E3C', label: 'Castanho' },
-  { id: 'h4', color: '#D4A017', label: 'Loiro' },
-  { id: 'h5', color: '#E8C45A', label: 'Loiro Claro' },
-  { id: 'h6', color: '#C0392B', label: 'Ruivo' },
-  { id: 'h7', color: '#9B59B6', label: 'Roxo' },
-  { id: 'h8', color: '#2980B9', label: 'Azul' },
-];
-
-const HAIR_STYLES = [
-  { id: 'hs1', label: 'Curto com franja', emoji: '✂️' },
-  { id: 'hs2', label: 'Bob curto', emoji: '💇‍♀️' },
-  { id: 'hs3', label: 'Longo liso', emoji: '👩' },
-  { id: 'hs4', label: 'Cachos', emoji: '🌀' },
-  { id: 'hs5', label: 'Rabo alto', emoji: '🎀' },
-  { id: 'hs6', label: 'Tranças', emoji: '🪢' },
-  { id: 'hs7', label: 'Afro', emoji: '☁️' },
-  { id: 'hs8', label: 'Pixie curto', emoji: '⚡' },
-];
+import CustomAvatar, { SKIN_TONES, HAIR_COLORS, HAIR_STYLES } from '@/components/game/CustomAvatar';
 
 const UNIFORM_COLORS = [
   '#E91E63', '#9C27B0', '#3F51B5', '#2196F3',
@@ -67,208 +33,25 @@ const JERSEY_NUMBERS = Array.from({ length: 23 }, (_, i) => i + 1);
 const XP_PER_LEVEL = 100;
 
 const MEDALS = [
-  { id: 'first_win',  name: 'Primeira Vitória', emoji: '🥇', desc: 'Vença sua primeira partida',  condition: (s) => (s?.wins   || 0) >= 1  },
-  { id: '3_goals',   name: 'Artilheira',        emoji: '⚽', desc: 'Marque 3 gols em partidas',   condition: (s) => (s?.goals  || 0) >= 3  },
-  { id: 'streak_3',  name: 'Em Chamas',         emoji: '🔥', desc: 'Vença 3 partidas seguidas',   condition: (s) => (s?.bestStreak || 0) >= 3 },
-  { id: '10_matches', name: 'Veterana',         emoji: '🏆', desc: 'Jogue 10 partidas',           condition: (s) => (s?.matches || 0) >= 10 },
-  { id: '5_wins',    name: 'Campeã',            emoji: '👑', desc: 'Vença 5 partidas',            condition: (s) => (s?.wins   || 0) >= 5  },
+  { id: 'first_win',  name: 'Primeira VitÃ³ria', emoji: 'ðŸ¥‡', desc: 'VenÃ§a sua primeira partida',  condition: (s) => (s?.wins   || 0) >= 1  },
+  { id: '3_goals',   name: 'Artilheira',        emoji: 'âš½', desc: 'Marque 3 gols em partidas',   condition: (s) => (s?.goals  || 0) >= 3  },
+  { id: 'streak_3',  name: 'Em Chamas',         emoji: 'ðŸ”¥', desc: 'VenÃ§a 3 partidas seguidas',   condition: (s) => (s?.bestStreak || 0) >= 3 },
+  { id: '10_matches', name: 'Veterana',         emoji: 'ðŸ†', desc: 'Jogue 10 partidas',           condition: (s) => (s?.matches || 0) >= 10 },
+  { id: '5_wins',    name: 'CampeÃ£',            emoji: 'ðŸ‘‘', desc: 'VenÃ§a 5 partidas',            condition: (s) => (s?.wins   || 0) >= 5  },
 ];
 
-// ═══════════════════════════════════════════════════
-// AVATAR SVG — moderno, divertido, animado
-// ═══════════════════════════════════════════════════
-function CustomAvatar({ skin, hairColor, hairStyle, uniformColor, shortsColor, bootsColor, number, size = 120 }) {
-  const sColor  = skin?.color        || '#F0C27F';
-  const hColor  = hairColor?.color   || '#1A1A1A';
-  const uColor  = uniformColor       || '#E91E63';
-  const srtColor = shortsColor       || '#212121';
-  const bColor  = bootsColor         || '#FFD600';
-
-  // Caminhos de cabelo por estilo
-  const hairTop = {
-    // Curto com franja
-    hs1: (
-      <>
-        <rect x="36" y="12" width="48" height="16" rx="8" fill={hColor} />
-        <rect x="36" y="20" width="48" height="8" rx="0" fill={hColor} />
-        <rect x="32" y="22" width="12" height="12" rx="4" fill={hColor} />
-        <rect x="76" y="22" width="12" height="12" rx="4" fill={hColor} />
-        <rect x="36" y="26" width="22" height="8" rx="4" fill={hColor} opacity="0.7" />
-      </>
-    ),
-    // Bob longo com volume
-    hs2: (
-      <>
-        <rect x="32" y="10" width="56" height="20" rx="10" fill={hColor} />
-        <rect x="30" y="22" width="10" height="24" rx="5" fill={hColor} />
-        <rect x="80" y="22" width="10" height="24" rx="5" fill={hColor} />
-        <rect x="32" y="28" width="56" height="10" rx="5" fill={hColor} opacity="0.6"/>
-      </>
-    ),
-    // Longo liso até o ombro
-    hs3: (
-      <>
-        <rect x="31" y="10" width="58" height="20" rx="10" fill={hColor} />
-        <rect x="28" y="22" width="12" height="38" rx="6" fill={hColor} />
-        <rect x="80" y="22" width="12" height="38" rx="6" fill={hColor} />
-        <rect x="38" y="26" width="44" height="6" rx="3" fill={hColor} opacity="0.5"/>
-      </>
-    ),
-    // Cacheado volumoso
-    hs4: (
-      <>
-        <ellipse cx="60" cy="18" rx="30" ry="14" fill={hColor} />
-        <circle cx="36" cy="28" r="8" fill={hColor} />
-        <circle cx="84" cy="28" r="8" fill={hColor} />
-        <circle cx="40" cy="38" r="6" fill={hColor} />
-        <circle cx="80" cy="38" r="6" fill={hColor} />
-        <circle cx="52" cy="42" r="5" fill={hColor} />
-        <circle cx="68" cy="42" r="5" fill={hColor} />
-        <ellipse cx="60" cy="16" rx="22" ry="10" fill={hColor} opacity="0.6"/>
-      </>
-    ),
-    // Rabo de cavalo alto
-    hs5: (
-      <>
-        <rect x="34" y="12" width="52" height="16" rx="8" fill={hColor} />
-        <ellipse cx="60" cy="14" rx="18" ry="8" fill={hColor} />
-        <rect x="56" y="10" width="8" height="30" rx="4" fill={hColor} />
-        <ellipse cx="60" cy="40" rx="7" ry="4" fill={hColor} opacity="0.8"/>
-        <rect x="55" y="40" width="10" height="20" rx="5" fill={hColor} opacity="0.7"/>
-      </>
-    ),
-    // Tranças (duas)
-    hs6: (
-      <>
-        <rect x="33" y="12" width="54" height="16" rx="8" fill={hColor} />
-        <rect x="33" y="24" width="9" height="32" rx="4" fill={hColor} />
-        <rect x="78" y="24" width="9" height="32" rx="4" fill={hColor} />
-        <rect x="35" y="30" width="5" height="4" rx="2" fill="rgba(255,255,255,0.2)" />
-        <rect x="35" y="38" width="5" height="4" rx="2" fill="rgba(255,255,255,0.2)" />
-        <rect x="80" y="30" width="5" height="4" rx="2" fill="rgba(255,255,255,0.2)" />
-        <rect x="80" y="38" width="5" height="4" rx="2" fill="rgba(255,255,255,0.2)" />
-      </>
-    ),
-    // Afro grande e redondo
-    hs7: (
-      <>
-        <ellipse cx="60" cy="16" rx="32" ry="18" fill={hColor} />
-        <ellipse cx="60" cy="22" rx="26" ry="12" fill={hColor} opacity="0.4"/>
-        <circle cx="38" cy="26" r="10" fill={hColor} />
-        <circle cx="82" cy="26" r="10" fill={hColor} />
-      </>
-    ),
-    // Corte joãozinho (bem curto, pixie)
-    hs8: (
-      <>
-        <rect x="36" y="14" width="48" height="12" rx="6" fill={hColor} />
-        <rect x="32" y="20" width="10" height="10" rx="4" fill={hColor} />
-        <rect x="78" y="20" width="10" height="10" rx="4" fill={hColor} />
-        <rect x="36" y="22" width="20" height="6" rx="3" fill={hColor} opacity="0.7"/>
-      </>
-    ),
-  };
-
-  return (
-    <motion.svg
-      width={size} height={size * 1.4}
-      viewBox="0 0 120 168"
-      animate={{ y: [0, -4, 0] }}
-      transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-    >
-      {/* Sombra */}
-      <ellipse cx="60" cy="164" rx="24" ry="4" fill="rgba(0,0,0,0.12)" />
-
-      {/* Chuteiras */}
-      <rect x="36" y="147" width="20" height="13" rx="4" fill={bColor} />
-      <rect x="64" y="147" width="20" height="13" rx="4" fill={bColor} />
-      <rect x="36" y="152" width="20" height="3" rx="1.5" fill="white" opacity="0.4" />
-      <rect x="64" y="152" width="20" height="3" rx="1.5" fill="white" opacity="0.4" />
-
-      {/* Pernas (meias) */}
-      <rect x="40" y="128" width="14" height="20" rx="5" fill={uColor} opacity="0.8"/>
-      <rect x="66" y="128" width="14" height="20" rx="5" fill={uColor} opacity="0.8"/>
-
-      {/* Short */}
-      <rect x="34" y="110" width="52" height="22" rx="8" fill={srtColor} />
-      <line x1="60" y1="110" x2="60" y2="132" stroke="white" strokeWidth="1" opacity="0.2"/>
-
-      {/* Corpo / Camisa */}
-      <rect x="30" y="72" width="60" height="42" rx="14" fill={uColor} />
-      <rect x="30" y="85" width="60" height="3" rx="1.5" fill="white" opacity="0.18" />
-      <text x="60" y="102" textAnchor="middle" fontSize="15" fontWeight="bold" fill="white" fontFamily="Arial">{number || '10'}</text>
-
-      {/* Gola */}
-      <path d="M48 72 Q60 80 72 72" fill={uColor} stroke="white" strokeWidth="1.5" />
-
-      {/* Braços */}
-      <rect x="12" y="74" width="19" height="34" rx="9" fill={sColor} />
-      <rect x="89" y="74" width="19" height="34" rx="9" fill={sColor} />
-      {/* Manga */}
-      <rect x="12" y="74" width="19" height="14" rx="9" fill={uColor} />
-      <rect x="89" y="74" width="19" height="14" rx="9" fill={uColor} />
-
-      {/* Mãos */}
-      <circle cx="21"  cy="110" r="7" fill={sColor} />
-      <circle cx="99"  cy="110" r="7" fill={sColor} />
-
-      {/* Pescoço */}
-      <rect x="53" y="60" width="14" height="16" rx="6" fill={sColor} />
-
-      {/* Rosto */}
-      <circle cx="60" cy="42" r="27" fill={sColor} />
-
-      {/* Bochecha corada */}
-      <circle cx="45" cy="49" r="5.5" fill="#FF9999" opacity="0.45" />
-      <circle cx="75" cy="49" r="5.5" fill="#FF9999" opacity="0.45" />
-
-      {/* Olhos com piscar */}
-      <motion.g
-        animate={{ scaleY: [1, 0.05, 1] }}
-        transition={{ duration: 3.5, repeat: Infinity, repeatDelay: 2.5 }}
-        style={{ transformOrigin: '60px 42px' }}
-      >
-        <ellipse cx="50" cy="42" rx="6"  ry="7" fill="white" />
-        <circle  cx="51" cy="42" r="4"   fill="#222" />
-        <circle  cx="53" cy="40" r="1.5" fill="white" />
-        <ellipse cx="70" cy="42" rx="6"  ry="7" fill="white" />
-        <circle  cx="71" cy="42" r="4"   fill="#222" />
-        <circle  cx="73" cy="40" r="1.5" fill="white" />
-      </motion.g>
-
-      {/* Sobrancelhas */}
-      <path d="M44 33 Q50 29 56 33" stroke={hColor} strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-      <path d="M64 33 Q70 29 76 33" stroke={hColor} strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-
-      {/* Nariz */}
-      <path d="M58 45 Q60 50 62 45" stroke={sColor} strokeWidth="1.5" fill="none" opacity="0.6"/>
-
-      {/* Boca animada */}
-      <motion.path
-        d="M50 54 Q60 63 70 54"
-        stroke="#C0392B" strokeWidth="2.5" fill="none" strokeLinecap="round"
-        animate={{ d: ['M50 54 Q60 63 70 54', 'M50 56 Q60 65 70 56', 'M50 54 Q60 63 70 54'] }}
-        transition={{ duration: 3, repeat: Infinity }}
-      />
-
-      {/* Cabelo */}
-      {hairTop[hairStyle?.id] || hairTop.hs1}
-    </motion.svg>
-  );
-}
-
-// ═══════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // BARRA XP
-// ═══════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 function XPBar({ xp }) {
   const level = Math.floor(xp / XP_PER_LEVEL) + 1;
   const currentXP = xp % XP_PER_LEVEL;
   const pct = (currentXP / XP_PER_LEVEL) * 100;
-  const skillBonus = Math.min(level * 2, 30); // bônus de habilidade por nível
+  const skillBonus = Math.min(level * 2, 30); // bÃ´nus de habilidade por nÃ­vel
   return (
     <div className="bg-card border border-border/30 rounded-2xl p-3">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-xs font-bold text-primary flex items-center gap-1"><Zap className="w-3 h-3" /> Nível {level}</span>
+        <span className="text-xs font-bold text-primary flex items-center gap-1"><Zap className="w-3 h-3" /> NÃ­vel {level}</span>
         <span className="text-[10px] text-muted-foreground">{currentXP}/{XP_PER_LEVEL} XP</span>
       </div>
       <div className="h-3 bg-muted rounded-full overflow-hidden">
@@ -280,16 +63,16 @@ function XPBar({ xp }) {
         />
       </div>
       <div className="flex justify-between mt-1.5">
-        <p className="text-[10px] text-muted-foreground">Jogue para ganhar XP 🚀</p>
+        <p className="text-[10px] text-muted-foreground">Jogue para ganhar XP ðŸš€</p>
         <p className="text-[10px] font-bold text-emerald-600">+{skillBonus}% habilidade</p>
       </div>
     </div>
   );
 }
 
-// ═══════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // EDITOR DE JOGADORA
-// ═══════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 function PlayerEditor({ profile, onSave, onClose }) {
   const [step, setStep] = useState(0); // 0:nome 1:pele 2:cabelo 3:uniforme 4:detalhes
 
@@ -304,11 +87,11 @@ function PlayerEditor({ profile, onSave, onClose }) {
   const [teamName,     setTeamName]    = useState(profile.customPlayer?.teamName || '');
 
   const steps = [
-    { label: 'Nome',     icon: '✏️' },
-    { label: 'Pele',     icon: '🎨' },
-    { label: 'Cabelo',   icon: '💇‍♀️' },
-    { label: 'Uniforme', icon: '👕' },
-    { label: 'Detalhes', icon: '⚙️' },
+    { label: 'Nome',     icon: 'âœï¸' },
+    { label: 'Pele',     icon: 'ðŸŽ¨' },
+    { label: 'Cabelo',   icon: 'ðŸ’‡â€â™€ï¸' },
+    { label: 'Uniforme', icon: 'ðŸ‘•' },
+    { label: 'Detalhes', icon: 'âš™ï¸' },
   ];
 
   const handleSave = () => {
@@ -341,7 +124,7 @@ function PlayerEditor({ profile, onSave, onClose }) {
           ))}
         </div>
 
-        {/* ── Step 0: Nome ── */}
+        {/* â”€â”€ Step 0: Nome â”€â”€ */}
         {step === 0 && (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
             <h3 className="font-bold">Nome da jogadora</h3>
@@ -355,11 +138,11 @@ function PlayerEditor({ profile, onSave, onClose }) {
               autoFocus
             />
             <p className="text-xs text-muted-foreground">Esse nome aparece no seu perfil e no jogo</p>
-            <button onClick={() => setStep(1)} className="w-full py-3 bg-primary text-white font-bold rounded-2xl">Próximo →</button>
+            <button onClick={() => setStep(1)} className="w-full py-3 bg-primary text-white font-bold rounded-2xl">PrÃ³ximo â†’</button>
           </motion.div>
         )}
 
-        {/* ── Step 1: Tom de pele ── */}
+        {/* â”€â”€ Step 1: Tom de pele â”€â”€ */}
         {step === 1 && (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
             <h3 className="font-bold">Tom de pele</h3>
@@ -376,13 +159,13 @@ function PlayerEditor({ profile, onSave, onClose }) {
               ))}
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setStep(0)} className="flex-1 py-3 bg-muted font-bold rounded-2xl">←</button>
-              <button onClick={() => setStep(2)} className="flex-1 py-3 bg-primary text-white font-bold rounded-2xl">Próximo →</button>
+              <button onClick={() => setStep(0)} className="flex-1 py-3 bg-muted font-bold rounded-2xl">â†</button>
+              <button onClick={() => setStep(2)} className="flex-1 py-3 bg-primary text-white font-bold rounded-2xl">PrÃ³ximo â†’</button>
             </div>
           </motion.div>
         )}
 
-        {/* ── Step 2: Cabelo ── */}
+        {/* â”€â”€ Step 2: Cabelo â”€â”€ */}
         {step === 2 && (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
             <h3 className="font-bold">Cor do cabelo</h3>
@@ -400,21 +183,34 @@ function PlayerEditor({ profile, onSave, onClose }) {
             <div className="grid grid-cols-4 gap-2">
               {HAIR_STYLES.map((h) => (
                 <button key={h.id} onClick={() => setHairStyle(h)}
-                  className={`rounded-xl p-2 border-2 flex flex-col items-center gap-1 transition-all ${hairStyle.id === h.id ? 'border-primary bg-primary/10 shadow-md' : 'border-border/30 bg-card'}`}
+                  className={`rounded-xl pt-1 pb-2 border-2 flex flex-col items-center gap-0.5 transition-all overflow-hidden ${hairStyle.id === h.id ? 'border-primary bg-primary/10 shadow-md' : 'border-border/30 bg-card'}`}
                 >
-                  <span className="text-xl">{h.emoji}</span>
-                  <span className="text-[9px] font-bold text-center leading-tight">{h.label}</span>
+                  {/* Mini avatar mostrando o estilo de cabelo */}
+                  <div className="overflow-hidden" style={{ height: 48, width: 40 }}>
+                    <CustomAvatar
+                      skin={skinTone}
+                      hairColor={hairColor}
+                      hairStyle={h}
+                      uniformColor={uniformColor}
+                      shortsColor={shortsColor}
+                      bootsColor={bootsColor}
+                      number={jerseyNum}
+                      size={40}
+                    />
+                  </div>
+                  <span className="text-[8px] font-bold text-center leading-tight px-1">{h.label}</span>
+                  {hairStyle.id === h.id && <Check className="w-3 h-3 text-primary" />}
                 </button>
               ))}
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setStep(1)} className="flex-1 py-3 bg-muted font-bold rounded-2xl">←</button>
-              <button onClick={() => setStep(3)} className="flex-1 py-3 bg-primary text-white font-bold rounded-2xl">Próximo →</button>
+              <button onClick={() => setStep(1)} className="flex-1 py-3 bg-muted font-bold rounded-2xl">â†</button>
+              <button onClick={() => setStep(3)} className="flex-1 py-3 bg-primary text-white font-bold rounded-2xl">PrÃ³ximo â†’</button>
             </div>
           </motion.div>
         )}
 
-        {/* ── Step 3: Uniforme, Short, Chuteira ── */}
+        {/* â”€â”€ Step 3: Uniforme, Short, Chuteira â”€â”€ */}
         {step === 3 && (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
             <h3 className="font-bold">Cor da camisa</h3>
@@ -445,16 +241,16 @@ function PlayerEditor({ profile, onSave, onClose }) {
               ))}
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setStep(2)} className="flex-1 py-3 bg-muted font-bold rounded-2xl">←</button>
-              <button onClick={() => setStep(4)} className="flex-1 py-3 bg-primary text-white font-bold rounded-2xl">Próximo →</button>
+              <button onClick={() => setStep(2)} className="flex-1 py-3 bg-muted font-bold rounded-2xl">â†</button>
+              <button onClick={() => setStep(4)} className="flex-1 py-3 bg-primary text-white font-bold rounded-2xl">PrÃ³ximo â†’</button>
             </div>
           </motion.div>
         )}
 
-        {/* ── Step 4: Número & Equipe ── */}
+        {/* â”€â”€ Step 4: NÃºmero & Equipe â”€â”€ */}
         {step === 4 && (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
-            <h3 className="font-bold">Número da camisa</h3>
+            <h3 className="font-bold">NÃºmero da camisa</h3>
             <div className="flex flex-wrap gap-2">
               {JERSEY_NUMBERS.map((n) => (
                 <button key={n} onClick={() => setJerseyNum(n)}
@@ -471,8 +267,8 @@ function PlayerEditor({ profile, onSave, onClose }) {
               maxLength={30}
             />
             <div className="flex gap-2">
-              <button onClick={() => setStep(3)} className="flex-1 py-3 bg-muted font-bold rounded-2xl">←</button>
-              <button onClick={handleSave} className="flex-1 py-3 bg-gradient-to-r from-primary to-pink-500 text-white font-bold rounded-2xl shadow-lg">Salvar ✓</button>
+              <button onClick={() => setStep(3)} className="flex-1 py-3 bg-muted font-bold rounded-2xl">â†</button>
+              <button onClick={handleSave} className="flex-1 py-3 bg-gradient-to-r from-primary to-pink-500 text-white font-bold rounded-2xl shadow-lg">Salvar âœ“</button>
             </div>
           </motion.div>
         )}
@@ -481,9 +277,9 @@ function PlayerEditor({ profile, onSave, onClose }) {
   );
 }
 
-// ═══════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // COMPONENTE PRINCIPAL
-// ═══════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 export default function Profile() {
   const [profile, setProfile] = useState(loadProfile);
   const [saved, setSaved] = useState(false);
@@ -551,7 +347,7 @@ export default function Profile() {
           <h1 className="font-heading text-3xl font-bold">Meu Perfil</h1>
         </motion.div>
 
-        {/* ── Card da Jogadora ── */}
+        {/* â”€â”€ Card da Jogadora â”€â”€ */}
         <motion.div
           initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
           className="max-w-sm mx-auto mb-4 bg-card rounded-3xl overflow-hidden shadow-xl border border-border/30"
@@ -566,7 +362,7 @@ export default function Profile() {
             >
               <Pencil className="w-3 h-3" /> Editar
             </button>
-            {/* Nível badge */}
+            {/* NÃ­vel badge */}
             <div className="absolute top-3 left-3 bg-black/30 backdrop-blur-sm text-white rounded-full px-2 py-1 flex items-center gap-1 text-xs font-bold">
               <Zap className="w-3 h-3 text-yellow-400" /> Nv. {level}
             </div>
@@ -604,9 +400,9 @@ export default function Profile() {
             {/* Stats de partida */}
             <div className="grid grid-cols-3 gap-2 mt-3">
               {[
-                { label: 'Partidas', value: profile.stats?.matches || 0, emoji: '⚽' },
-                { label: 'Vitórias',  value: profile.stats?.wins    || 0, emoji: '🏆' },
-                { label: 'Win%',      value: profile.stats?.matches ? winRate + '%' : '—', emoji: '📊' },
+                { label: 'Partidas', value: profile.stats?.matches || 0, emoji: 'âš½' },
+                { label: 'VitÃ³rias',  value: profile.stats?.wins    || 0, emoji: 'ðŸ†' },
+                { label: 'Win%',      value: profile.stats?.matches ? winRate + '%' : 'â€”', emoji: 'ðŸ“Š' },
               ].map(({ label, value, emoji }) => (
                 <div key={label} className="bg-muted rounded-xl p-2 text-center">
                   <span className="text-base block">{emoji}</span>
@@ -616,7 +412,7 @@ export default function Profile() {
               ))}
             </div>
 
-            {/* Aparência rápida */}
+            {/* AparÃªncia rÃ¡pida */}
             <div className="flex items-center gap-2 mt-3 bg-muted/40 rounded-xl p-2.5">
               <div className="w-5 h-5 rounded-full border border-white shadow" style={{ backgroundColor: skinTone.color }} title="Tom de pele" />
               <div className="w-5 h-5 rounded-full border border-white shadow" style={{ backgroundColor: hairColor.color }} title="Cabelo" />
@@ -628,17 +424,17 @@ export default function Profile() {
           </div>
         </motion.div>
 
-        {/* ── Time do Coração ── */}
+        {/* â”€â”€ Time do CoraÃ§Ã£o â”€â”€ */}
         <motion.div
           initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}
           className="max-w-sm mx-auto mb-5"
         >
           <div className="flex items-center gap-2 mb-3">
             <Heart className="w-5 h-5 text-red-500" />
-            <h2 className="font-heading font-bold text-lg">Time do Coração</h2>
+            <h2 className="font-heading font-bold text-lg">Time do CoraÃ§Ã£o</h2>
           </div>
 
-          {/* Animação de coração após salvar */}
+          {/* AnimaÃ§Ã£o de coraÃ§Ã£o apÃ³s salvar */}
           <AnimatePresence>
             {heartAnimation && (
               <motion.div
@@ -653,7 +449,7 @@ export default function Profile() {
                     transition={{ duration: 1.2 }}
                     className="text-8xl"
                   >
-                    ❤️
+                    â¤ï¸
                   </motion.div>
                   <motion.p
                     initial={{ y: 20, opacity: 0 }}
@@ -661,14 +457,14 @@ export default function Profile() {
                     transition={{ delay: 0.4 }}
                     className="font-heading font-black text-2xl text-red-500 mt-3 drop-shadow-lg bg-white/90 px-4 py-2 rounded-full"
                   >
-                    {profile.favoriteTeam}! ❤️
+                    {profile.favoriteTeam}! â¤ï¸
                   </motion.p>
                   <motion.div
                     className="mt-2 text-4xl"
                     animate={{ y: [0, -20, 0, -15, 0] }}
                     transition={{ duration: 2, delay: 0.5 }}
                   >
-                    🎉🎊🎉
+                    ðŸŽ‰ðŸŽŠðŸŽ‰
                   </motion.div>
                 </div>
               </motion.div>
@@ -678,10 +474,10 @@ export default function Profile() {
           <div className="bg-card rounded-2xl border border-border/30 shadow p-4">
             {profile.favoriteTeam && !editingTeam ? (
               <div className="flex items-center gap-3">
-                <div className="text-4xl">❤️</div>
+                <div className="text-4xl">â¤ï¸</div>
                 <div className="flex-1">
                   <p className="font-heading font-bold text-lg">{profile.favoriteTeam}</p>
-                  <p className="text-xs text-muted-foreground">Meu time do coração</p>
+                  <p className="text-xs text-muted-foreground">Meu time do coraÃ§Ã£o</p>
                 </div>
                 <button
                   onClick={() => { setTeamInput(profile.favoriteTeam); setEditingTeam(true); }}
@@ -692,7 +488,7 @@ export default function Profile() {
               </div>
             ) : (
               <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">Qual é o seu time do coração? ❤️</p>
+                <p className="text-sm text-muted-foreground">Qual Ã© o seu time do coraÃ§Ã£o? â¤ï¸</p>
                 <input
                   type="text"
                   value={teamInput}
@@ -711,7 +507,7 @@ export default function Profile() {
                     disabled={!teamInput.trim()}
                     className="flex-1 py-2.5 bg-gradient-to-r from-red-500 to-pink-500 text-white font-bold rounded-xl text-sm shadow disabled:opacity-40"
                   >
-                    ❤️ Salvar meu time!
+                    â¤ï¸ Salvar meu time!
                   </button>
                 </div>
               </div>
@@ -719,7 +515,7 @@ export default function Profile() {
           </div>
         </motion.div>
 
-        {/* ── Conquistas ── */}
+        {/* â”€â”€ Conquistas â”€â”€ */}
         <motion.div
           initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}
           className="max-w-sm mx-auto mb-5"

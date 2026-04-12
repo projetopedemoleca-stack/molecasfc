@@ -7,6 +7,7 @@ import { getAbility } from '@/lib/playerAbilities';
 import { loadProfile, saveProfile, isPlayerUnlocked, isTeamUnlocked, getGlobalLevel, getLevelInfo, getPlayerUnlockLevel } from '@/lib/playerProfile';
 import { audio } from '@/lib/audioEngine';
 import PlayerAvatar from '@/components/game/PlayerAvatar';
+import CustomAvatar, { SKIN_TONES, HAIR_COLORS, HAIR_STYLES } from '@/components/game/CustomAvatar';
 
 // ─── Color palettes ──────────────────────────────────────────────
 const UNIFORM_COLORS = [
@@ -173,34 +174,42 @@ export default function CharacterSelect() {
           <motion.div key="player" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
             {/* Player grid */}
             <div className="grid grid-cols-5 gap-2 max-w-sm mx-auto mb-4">
-              {hasCustomPlayer && (
-                <motion.div
-                  key="custom"
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setSelectedId('custom')}
-                  className={`relative p-3 rounded-2xl border-2 cursor-pointer transition-all ${
-                    selectedId === 'custom'
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border/30 bg-card hover:border-primary/50'
-                  }`}
-                >
-                  <div className="text-center">
-                    <div className="text-3xl mb-1">
-                      {customPlayer.skinTone || '👧'}
+              {hasCustomPlayer && (() => {
+                const cp = customPlayer;
+                const skinObj  = SKIN_TONES.find(s => s.id === cp.skinTone)    || SKIN_TONES[1];
+                const hairObj  = HAIR_COLORS.find(h => h.id === cp.hairColor)  || HAIR_COLORS[0];
+                const styleObj = HAIR_STYLES.find(h => h.id === cp.hairStyle)  || HAIR_STYLES[2];
+                return (
+                  <motion.div
+                    key="custom"
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setSelectedId('custom')}
+                    className={`relative p-2 rounded-2xl border-2 cursor-pointer transition-all flex flex-col items-center ${
+                      selectedId === 'custom'
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border/30 bg-card hover:border-primary/50'
+                    }`}
+                  >
+                    <div className="overflow-hidden" style={{ height: 56, width: 44 }}>
+                      <CustomAvatar
+                        skin={skinObj} hairColor={hairObj} hairStyle={styleObj}
+                        uniformColor={cp.uniformColor} shortsColor={cp.shortsColor}
+                        bootsColor={cp.bootsColor} number={cp.jerseyNumber}
+                        size={44}
+                      />
                     </div>
-                    <p className="font-bold text-xs truncate">{customPlayer.playerName}</p>
-                    <p className="text-[9px] text-muted-foreground">Minha Jogadora</p>
-                  </div>
-                  {selectedId === 'custom' && (
-                    <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
-                      <Check className="w-2.5 h-2.5 text-white" />
+                    <p className="font-bold text-[8px] truncate w-full text-center mt-0.5">{cp.playerName}</p>
+                    {selectedId === 'custom' && (
+                      <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                        <Check className="w-2.5 h-2.5 text-white" />
+                      </div>
+                    )}
+                    <div className="absolute -top-1 -left-1">
+                      <span className="text-[9px] bg-yellow-400 text-yellow-900 font-bold px-1 rounded-full">✨</span>
                     </div>
-                  )}
-                  <div className="absolute -top-1 -left-1">
-                    <span className="text-[10px] bg-yellow-400 text-yellow-900 font-bold px-1 rounded-full">✨ Minha</span>
-                  </div>
-                </motion.div>
-              )}
+                  </motion.div>
+                );
+              })()}
               {PLAYERS.map(p => {
                 const unlocked = isPlayerUnlocked(p.id, profile);
                 return (

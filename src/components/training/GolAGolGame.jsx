@@ -115,18 +115,19 @@ export default function GolAGolGame() {
       if (frame % 2 === 0) trail.push({ ...pos });
       setBallTrail([...trail]);
 
-      // Goleira se move para defender
-      setKeeperPos(prev => {
+      // Goleira se move — calculado SINCRONAMENTE para checagem correta
+      {
         const targetX = who === 'player' ? pos.x : FIELD_W / 2;
         const speed = config.keeperSpeed;
+        const prev = keeperPosRef.current;
         const diff = targetX - prev.x;
         const next = {
           x: clamp(prev.x + Math.sign(diff) * Math.min(Math.abs(diff), speed), GOAL_W / 2, FIELD_W - GOAL_W / 2),
           y: prev.y,
         };
         keeperPosRef.current = next;
-        return next;
-      });
+        setKeeperPos(next);
+      }
 
       const inGoalY = who === 'player' ? pos.y < GOAL_H + 20 : pos.y > FIELD_H - GOAL_H - 20;
       const inGoalX = Math.abs(pos.x - FIELD_W / 2) < GOAL_W / 2;
