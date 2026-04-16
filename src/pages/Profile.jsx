@@ -411,7 +411,7 @@ export default function Profile() {
               >
                 <div className="text-center">
                   <motion.div
-                    animate={{ scale: [1, 1.3, 1, 1.3, 1], rotate: [-5, 5, -5, 5, 0← Voltar</motion.div>
+                    animate={{ scale: [1, 1.3, 1, 1.3, 1], rotate: [-5, 5, -5, 5, 0] }} />
                   <motion.p
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
@@ -422,7 +422,7 @@ export default function Profile() {
                   </motion.p>
                   <motion.div
                     className="mt-2 text-4xl"
-                    animate={{ y: [0, -20, 0, -15, 0← Voltar</motion.div>
+                    animate={{ y: [0, -20, 0, -15, 0] }} />
                 </div>
               </motion.div>
             )}
