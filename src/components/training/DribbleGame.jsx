@@ -1,233 +1,278 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// FUT DE RUA — 1v1, dois gols (chinelos), dois jogadores
+// Você controla a bola com joystick. Bot defende.
+// Se esbarrar em obstáculo perde a bola pro bot.
+// Bot também erra se bater em obstáculo.
+// ═══════════════════════════════════════════════════════════════════════════
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, RotateCcw, Volume2, VolumeX } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Volume2, VolumeX, RotateCcw } from 'lucide-react';
 import { audio } from '@/lib/audioEngine';
-import { bgMusic } from '@/lib/trainingMusic';
 
-// ═══════════════════════════════════════════════════════════════════════════
-// FUT DE RUA MELHORADO (Original + V2)
-// ═══════════════════════════════════════════════════════════════════════════
-
-const FIELD_W = 360;
-const FIELD_H = 520;
-const GOAL_W = 120;
-const GOAL_H = 70;
+const FIELD_W  = 360;
+const FIELD_H  = 520;
+const GOAL_W   = 100;
+const GOAL_H   = 60;
 const PLAYER_R = 24;
-const BOT_R = 22;
+const BOT_R    = 24;
+const BALL_R   = 10;
+
+function clamp(v, mn, mx) { return Math.max(mn, Math.min(mx, v)); }
+function dist(a, b) { return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2); }
 
 const BALL_TYPES = [
-  { id: 'head',   name: 'Cabeça de Boneca', emoji: '🧠', speed: 0.95, desc: 'Leve e imprevisível' },
-  { id: 'can',    name: 'Lata',         emoji: '🥫', speed: 0.80, desc: 'Pesada e reta' },
-  { id: 'stone',  name: 'Pedra',        emoji: '🪨', speed: 0.60, desc: 'Muito pesada' },
-  { id: 'paper',  name: 'Papel Amassado', emoji: '📄', speed: 1.10, desc: 'Leve e flutuante' },
-  { id: 'bottle', name: 'Garrafinha',   emoji: '🍼', speed: 1.00, desc: 'Equilibrada' },
-  { id: 'lemon',  name: 'Limão',        emoji: '🍋', speed: 1.00, desc: 'Irregular' },
-  { id: 'cap',    name: 'Tampinha',    emoji: '🪙', speed: 1.05, desc: 'Muito leve' },
-  { id: 'tennis', name: 'Bolinha de Tênis', emoji: '🎾', speed: 1.15, desc: 'Muito rápida e quicante' },
-  { id: 'deflated', name: 'Bola Murcha', emoji: '🏀', speed: 0.70, desc: 'Lenta e imprevisível' },
+  { id: 'head',    name: 'Cabeça de Boneca',  emoji: '🧠', speed: 1.0,  desc: 'Leve e imprevisível' },
+  { id: 'can',     name: 'Lata',               emoji: '🥫', speed: 0.8,  desc: 'Pesada e reta' },
+  { id: 'stone',  name: 'Pedra',              emoji: '🪨', speed: 0.6,  desc: 'Muito pesada' },
+  { id: 'paper',  name: 'Papel Amassado',     emoji: '📄', speed: 1.1,  desc: 'Leve e flutuante' },
+  { id: 'bottle', name: 'Garrafinha',         emoji: '🍼', speed: 1.0,  desc: 'Equilibrada' },
+  { id: 'lemon',  name: 'Limão',              emoji: '🍋', speed: 1.0,  desc: 'Irregular' },
+  { id: 'cap',    name: 'Tampinha',           emoji: '🪙', speed: 1.05, desc: 'Muito leve' },
+  { id: 'tennis', name: 'Bolinha de Tênis',   emoji: '🎾', speed: 1.15, desc: 'Rápida e quicante' },
+  { id: 'deflated', name: 'Bola Murcha',      emoji: '🏀', speed: 0.7,  desc: 'Lenta e imprevisível' },
 ];
 
 const OBSTACLE_TYPES = [
-  { id: 'dog',  name: 'Cachorrinho',      emoji: '🐕', behavior: 'patrol', desc: 'Corre de um lado pro outro' },
-  { id: 'car',  name: 'Carro Estacionado', emoji: '🚗', behavior: 'static', desc: 'Bloqueia o caminho' },
-  { id: 'cat',  name: 'Gato',            emoji: '🐱', behavior: 'patrol', desc: 'Passeia pelo local' },
-  { id: 'bike', name: 'Bicicleta',       emoji: '🚲', behavior: 'parked', desc: 'Estacionada no canto' },
-  { id: 'bin',  name: 'Lixeira',         emoji: '🗑️', behavior: 'static', desc: 'Obstáculo fixo' },
-  { id: 'granny', name: 'Velhinha',      emoji: '👵', behavior: 'slow', desc: 'Anda devagar pela rua' },
+  { id: 'dog',    name: 'Cachorrinho',       emoji: '🐕', behavior: 'patrol', desc: 'Corre de um lado a outro' },
+  { id: 'car',    name: 'Carro Estacionado', emoji: '🚗', behavior: 'static', desc: 'Bloqueia o caminho' },
+  { id: 'cat',    name: 'Gato',              emoji: '🐱', behavior: 'patrol', desc: 'Passeia pela rua' },
+  { id: 'bike',   name: 'Bicicleta',         emoji: '🚲', behavior: 'static', desc: 'Estacionada no canto' },
+  { id: 'bin',    name: 'Lixeira',           emoji: '🗑️', behavior: 'static', desc: 'Obstáculo fixo' },
+  { id: 'granny', name: 'Velhinha',         emoji: '👵', behavior: 'slow',   desc: 'Anda bem devagar' },
+  { id: 'speaker', name: 'Caixinha de Som',  emoji: '📻', behavior: 'static', desc: 'Som de rua' },
 ];
 
 const LEVELS = [
-  { label: 'Nível 1', goals: 3, time: 60, botSpeed: 1.2, obstacles: 1, desc: 'Rua calma - aprenda os controles' },
-  { label: 'Nível 2', goals: 4, time: 55, botSpeed: 1.6, obstacles: 2, desc: 'Cuidado com os cachorros!' },
-  { label: 'Nível 3', goals: 5, time: 50, botSpeed: 2.0, obstacles: 3, desc: 'Mais obstáculos na rua!' },
-  { label: 'Nível 4', goals: 5, time: 45, botSpeed: 2.5, obstacles: 3, desc: 'Velocidade aumentando!' },
-  { label: 'Nível 5', goals: 6, time: 40, botSpeed: 3.0, obstacles: 4, desc: 'Fim de semana na rua!' },
+  { label: 'Nível 1', goals: 3, time: 60, botSpeed: 1.0, obstacles: 1, desc: 'Rua calma — aprenda!' },
+  { label: 'Nível 2', goals: 4, time: 55, botSpeed: 1.4, obstacles: 2, desc: 'Mais obstáculos!' },
+  { label: 'Nível 3', goals: 5, time: 50, botSpeed: 1.8, obstacles: 3, desc: 'Velocidade subindo!' },
+  { label: 'Nível 4', goals: 5, time: 45, botSpeed: 2.2, obstacles: 3, desc: 'Quase lá!' },
+  { label: 'Nível 5', goals: 6, time: 40, botSpeed: 2.6, obstacles: 4, desc: 'Rua lotada!' },
 ];
 
-function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
-function dist(a, b) { return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2); }
-
 export default function DribbleGame() {
-  const [phase, setPhase] = useState('menu');
-  const [level, setLevel] = useState(0);
-  const [score, setScore] = useState(0);
-  const [goals, setGoals] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(60);
-  const [lives, setLives] = useState(3);
+  const [phase, setPhase]         = useState('menu');
+  const [level, setLevel]         = useState(0);
+  const [score, setScore]         = useState(0);
+  const [playerGoals, setPlayerGoals] = useState(0);
+  const [botGoals, setBotGoals]   = useState(0);
+  const [timeLeft, setTimeLeft]   = useState(60);
+  const [lives, setLives]         = useState(3);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [ballOwner, setBallOwner] = useState('player');
-
-  // Seleção
   const [selectedBall, setSelectedBall] = useState(BALL_TYPES[0]);
   const [selectedObstacles, setSelectedObstacles] = useState([]);
-
-  // Posições
-  const [playerPos, setPlayerPos] = useState({ x: FIELD_W / 2, y: FIELD_H - 80 });
-  const [botPos, setBotPos] = useState({ x: FIELD_W / 2, y: 120 });
+  const [playerPos, setPlayerPos] = useState({ x: FIELD_W / 2, y: FIELD_H - 100 });
+  const [botPos, setBotPos]       = useState({ x: FIELD_W / 2, y: 100 });
+  const [ballPos, setBallPos]     = useState({ x: FIELD_W / 2, y: FIELD_H - 100 });
   const [obstaclePositions, setObstaclePositions] = useState([]);
-
-  // Controle
-  const [joystick, setJoystick] = useState({ x: 0, y: 0, active: false });
-  const [joystickCenter, setJoystickCenter] = useState(null);
+  const [joystick, setJoystick]   = useState({ x: 0, y: 0, active: false });
   const [showGoalEffect, setShowGoalEffect] = useState(false);
+  const [goalSide, setGoalSide]   = useState(null); // 'player' | 'bot' | null
   const [showHitEffect, setShowHitEffect] = useState(false);
+  const [winner, setWinner]       = useState(null);
 
   const config = LEVELS[level] || LEVELS[0];
-  const rafRef = useRef(null);
-  const joyRef = useRef(null);
-  const joyCenterRef = useRef(null);
+  const rafRef    = useRef(null);
+  const joyRef    = useRef(null);
+  const joyCtrRef = useRef(null);
+  const posRef    = useRef({ player: { x: FIELD_W / 2, y: FIELD_H - 100 }, bot: { x: FIELD_W / 2, y: 100 }, ball: { x: FIELD_W / 2, y: FIELD_H - 100 } });
 
-  const playSound = (sound) => {
-    if (soundEnabled) audio.play?.(sound);
-  };
+  const playSound = useCallback((name) => {
+    if (!soundEnabled) return;
+    try { audio[name]?.(); } catch {}
+  }, [soundEnabled]);
 
-  // Gerar obstáculos
-  const generateObstacles = useCallback(() => {
-    const obsList = selectedObstacles.length > 0 
-      ? selectedObstacles 
-      : OBSTACLE_TYPES.slice(0, config.obstacles);
-    
-    const newObstacles = obsList.map((type, i) => ({
-      id: i,
-      type,
-      x: 40 + Math.random() * (FIELD_W - 80),
-      y: 100 + Math.random() * (FIELD_H - 250),
-      dir: Math.random() > 0.5 ? 1 : -1,
-      speed: 0.5 + Math.random() * 0.5,
-    }));
-    setObstaclePositions(newObstacles);
-  }, [selectedObstacles, config.obstacles]);
-
-  // Iniciar nível
-  const initLevel = useCallback((lvl) => {
+  // ── Iniciar nível ────────────────────────────────────────────────────────
+  const initLevel = useCallback((lvl = 0) => {
+    const cfg = LEVELS[lvl] || LEVELS[0];
+    const pPos = { x: FIELD_W / 2, y: FIELD_H - 100 };
+    const bPos = { x: FIELD_W / 2, y: 100 };
     setLevel(lvl);
-    setGoals(0);
-    setTimeLeft(LEVELS[lvl].time);
-    setPlayerPos({ x: FIELD_W / 2, y: FIELD_H - 80 });
-    setBotPos({ x: FIELD_W / 2, y: 120 });
+    setPlayerGoals(0);
+    setBotGoals(0);
+    setLives(3);
+    setTimeLeft(cfg.time);
     setBallOwner('player');
-    generateObstacles();
-    setPhase('playing');
-    playSound('start');
-  }, [generateObstacles]);
+    setPlayerPos(pPos);
+    setBotPos(bPos);
+    setBallPos({ ...pPos });
+    setObstaclePositions([]);
+    setShowGoalEffect(false);
+    setShowHitEffect(false);
+    setWinner(null);
+    posRef.current = { player: { ...pPos }, bot: { ...bPos }, ball: { ...pPos } };
 
-  // Game loop
+    // Posicionar obstáculos
+    const obs = (selectedObstacles.length > 0 ? selectedObstacles : OBSTACLE_TYPES.slice(0, cfg.obstacles)).map((o, i) => ({
+      ...o,
+      x: 40 + (i * (FIELD_W - 80)) / (cfg.obstacles || 1),
+      y: FIELD_H / 2 + (i % 2 === 0 ? -60 : 60),
+      dir: i % 2 === 0 ? 1 : -1,
+      speed: 1.5 + i * 0.3,
+    }));
+    setObstaclePositions(obs);
+    setPhase('playing');
+  }, [selectedObstacles]);
+
+  // ── Game loop ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (phase !== 'playing') { cancelAnimationFrame(rafRef.current); return; }
 
-    const speed = 3.5 * selectedBall.speed;
-
     const loop = () => {
+      const spd = selectedBall.speed;
+      const p = posRef.current;
+
       // Mover jogador com joystick
-      setPlayerPos(prev => ({
-        x: clamp(prev.x + joystick.x * speed, PLAYER_R, FIELD_W - PLAYER_R),
-        y: clamp(prev.y + joystick.y * speed, PLAYER_R, FIELD_H - PLAYER_R),
-      }));
+      const newPlayer = {
+        x: clamp(p.player.x + joystick.x * 3.5 * spd, PLAYER_R, FIELD_W - PLAYER_R),
+        y: clamp(p.player.y + joystick.y * 3.5 * spd, PLAYER_R, FIELD_H - PLAYER_R),
+      };
+      posRef.current = { ...p, player: newPlayer };
+      setPlayerPos(newPlayer);
 
-      // Bot: persegue jogador (sem bola) ou vai pro gol (com bola)
-      setBotPos(prev => {
-        const target = ballOwner === 'bot'
-          ? { x: FIELD_W / 2, y: 30 }  // gol do topo
-          : playerPos;                   // perseguir jogador
-        const dx = target.x - prev.x;
-        const dy = target.y - prev.y;
-        const d = Math.sqrt(dx * dx + dy * dy) || 1;
-        const botSpeed = config.botSpeed;
-        return {
-          x: clamp(prev.x + (dx / d) * botSpeed, BOT_R, FIELD_W - BOT_R),
-          y: clamp(prev.y + (dy / d) * botSpeed, BOT_R, FIELD_H - BOT_R),
-        };
-      });
+      // Bola segue o dono
+      const newBall = ballOwner === 'player' ? { ...newPlayer } : { ...p.ball };
+      if (ballOwner === 'player') {
+        posRef.current = { ...posRef.current, ball: newBall };
+        setBallPos(newBall);
+      }
 
-      // Atualizar obstáculos móveis
+      // Bot: defender gol do jogador (y = 0) ou atacar gol do bot (y = FIELD_H)
+      const botTargetY = 40; // gol do bot é embaixo (FIELD_H - GOAL_H)
+      const botShouldAttack = ballOwner === 'bot';
+      const botTarget = botShouldAttack
+        ? { x: FIELD_W / 2, y: FIELD_H - 50 }
+        : { x: p.ball.x, y: 40 };
+
+      const bDx = botTarget.x - p.bot.x;
+      const bDy = botTarget.y - p.bot.y;
+      const bD  = Math.sqrt(bDx * bDx + bDy * bDy) || 1;
+      const newBot = {
+        x: clamp(p.bot.x + (bDx / bD) * config.botSpeed * spd, BOT_R, FIELD_W - BOT_R),
+        y: clamp(p.bot.y + (bDy / bD) * config.botSpeed * spd, BOT_R, FIELD_H - BOT_R),
+      };
+      posRef.current = { ...posRef.current, bot: newBot };
+      setBotPos(newBot);
+
+      // Mover obstáculos
       setObstaclePositions(prev => prev.map(obs => {
-        if (obs.type.behavior === 'patrol') {
-          let newX = obs.x + obs.dir * obs.speed;
-          if (newX < 30 || newX > FIELD_W - 30) {
-            return { ...obs, dir: -obs.dir };
-          }
-          return { ...obs, x: newX };
+        if (obs.behavior === 'patrol') {
+          const nx = obs.x + obs.dir * obs.speed;
+          if (nx < 30 || nx > FIELD_W - 30) return { ...obs, dir: -obs.dir };
+          return { ...obs, x: nx };
         }
-        if (obs.type.behavior === 'slow') {
-          // Velhinha anda devagar
-          let newX = obs.x + obs.dir * (obs.speed * 0.3);
-          if (newX < 30 || newX > FIELD_W - 30) {
-            return { ...obs, dir: -obs.dir };
-          }
-          return { ...obs, x: newX };
+        if (obs.behavior === 'slow') {
+          const nx = obs.x + obs.dir * obs.speed * 0.3;
+          if (nx < 30 || nx > FIELD_W - 30) return { ...obs, dir: -obs.dir };
+          return { ...obs, x: nx };
         }
         return obs;
       }));
 
-      // Colisão com bot — troca de posse
-      if (dist(playerPos, botPos) < PLAYER_R + BOT_R - 5) {
-        setBallOwner(prev => {
-          if (prev === 'player') {
-            // Bot rouba a bola
+      // ── Colisão bot-jogador (disputa de bola) ──
+      if (dist(newPlayer, newBot) < PLAYER_R + BOT_R - 4) {
+        if (ballOwner === 'player') {
+          setBallOwner('bot');
+          setShowHitEffect(true);
+          playSound('lose');
+          setTimeout(() => setShowHitEffect(false), 500);
+        } else {
+          setBallOwner('player');
+          playSound('pass');
+        }
+      }
+
+      // ── Jogador esbarrou em obstáculo → perde bola ──
+      for (const obs of obstaclePositions) {
+        if (dist(newPlayer, { x: obs.x, y: obs.y }) < PLAYER_R + 16) {
+          if (ballOwner === 'player') {
+            setBallOwner('bot');
             setShowHitEffect(true);
             playSound('lose');
-            setTimeout(() => setShowHitEffect(false), 600);
-            return 'bot';
-          } else {
-            // Jogador recupera a bola
-            setShowGoalEffect(false);
-            playSound('pass');
-            return 'player';
+            setTimeout(() => setShowHitEffect(false), 500);
           }
-        });
+          break;
+        }
       }
 
-      // Bot marcou gol!
-      if (ballOwner === 'bot' && botPos.y < 50 && Math.abs(botPos.x - FIELD_W / 2) < GOAL_W / 2 + 20) {
+      // ── Bot esbarrou em obstáculo → perde bola ──
+      for (const obs of obstaclePositions) {
+        if (dist(newBot, { x: obs.x, y: obs.y }) < BOT_R + 16) {
+          if (ballOwner === 'bot') {
+            setBallOwner('player');
+            playSound('pass');
+          }
+          break;
+        }
+      }
+
+      // ── Gol do BOT (bola na parte de cima) ──
+      const ballY = ballOwner === 'bot' ? newBot.y : p.ball.y;
+      const ballX  = ballOwner === 'bot' ? newBot.x : p.ball.x;
+      if (ballY < GOAL_H + 15 && Math.abs(ballX - FIELD_W / 2) < GOAL_W / 2 + 10) {
+        // Bot marcou!
         setBallOwner('player');
-        const newLives = lives - 1;
-        setLives(newLives);
-        setShowHitEffect(true);
-        playSound('lose');
-        setTimeout(() => setShowHitEffect(false), 800);
-        if (newLives <= 0) {
-          setPhase('result');
-        } else {
-          setPlayerPos({ x: FIELD_W / 2, y: FIELD_H - 80 });
-          setBotPos({ x: FIELD_W / 2, y: 120 });
-        }
-      }
-
-      // Colisão com obstáculos
-      obstaclePositions.forEach(obs => {
-        if (dist(playerPos, { x: obs.x, y: obs.y }) < PLAYER_R + 18) {
-          const angle = Math.atan2(playerPos.y - obs.y, playerPos.x - obs.x);
-          setPlayerPos(prev => ({
-            x: clamp(prev.x + Math.cos(angle) * 5, PLAYER_R, FIELD_W - PLAYER_R),
-            y: clamp(prev.y + Math.sin(angle) * 5, PLAYER_R, FIELD_H - PLAYER_R),
-          }));
-        }
-      });
-
-      // Verificar gol
-      if (playerPos.y < GOAL_H + 30 && Math.abs(playerPos.x - FIELD_W / 2) < GOAL_W / 2) {
-        const newGoals = goals + 1;
-        const newScore = score + (level + 1) * 15;
-        setGoals(newGoals);
-        setScore(newScore);
+        setBotGoals(g => g + 1);
+        setScore(s => s + 10);
         setShowGoalEffect(true);
-        playSound('win');
-        
+        setGoalSide('bot');
+        playSound('goal');
         setTimeout(() => {
           setShowGoalEffect(false);
-          if (newGoals >= config.goals) {
-            const nextLvl = level + 1;
-            if (nextLvl >= LEVELS.length) {
-              setPhase('result');
-              playSound('victory');
-            } else {
-              initLevel(nextLvl);
-            }
+          setGoalSide(null);
+          const newBGoals = botGoals + 1;
+          if (newBGoals >= config.goals) {
+            setWinner('bot');
+            setPhase('result');
           } else {
-            setPlayerPos({ x: FIELD_W / 2, y: FIELD_H - 80 });
-            setBotPos({ x: FIELD_W / 2, y: 120 });
+            const rp = { x: FIELD_W / 2, y: FIELD_H - 100 };
+            const rb = { x: FIELD_W / 2, y: 100 };
+            setPlayerPos(rp);
+            setBotPos(rb);
+            setBallPos({ ...rp });
+            posRef.current = { player: rp, bot: rb, ball: rp };
           }
-        }, 1500);
+        }, 1200);
+        cancelAnimationFrame(rafRef.current);
+        return;
+      }
+
+      // ── Gol do JOGADOR (bola na parte de baixo) ──
+      if (ballOwner === 'bot' && newBot.y > FIELD_H - GOAL_H - 15 && Math.abs(newBot.x - FIELD_W / 2) < GOAL_W / 2 + 10) {
+        // Jogador marcou!
+        setBallOwner('player');
+        setPlayerGoals(g => g + 1);
+        const pts = (level + 1) * 20;
+        setScore(s => s + pts);
+        setShowGoalEffect(true);
+        setGoalSide('player');
+        playSound('win');
+        setTimeout(() => {
+          setShowGoalEffect(false);
+          setGoalSide(null);
+          const newPGoals = playerGoals + 1;
+          if (newPGoals >= config.goals) {
+            setWinner('player');
+            setPhase('result');
+          } else {
+            const rp = { x: FIELD_W / 2, y: FIELD_H - 100 };
+            const rb = { x: FIELD_W / 2, y: 100 };
+            setPlayerPos(rp);
+            setBotPos(rb);
+            setBallPos({ ...rp });
+            posRef.current = { player: rp, bot: rb, ball: rp };
+          }
+        }, 1200);
+        cancelAnimationFrame(rafRef.current);
+        return;
+      }
+
+      // Sincronizar bola com bot quando bot tem a bola
+      if (ballOwner === 'bot') {
+        const syncedBall = { x: newBot.x, y: newBot.y + 20 };
+        posRef.current = { ...posRef.current, ball: syncedBall };
+        setBallPos(syncedBall);
       }
 
       rafRef.current = requestAnimationFrame(loop);
@@ -235,612 +280,316 @@ export default function DribbleGame() {
 
     rafRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [phase, joystick, playerPos, botPos, obstaclePositions, goals, level, score, config, lives, selectedBall, initLevel, ballOwner]);
+  }, [phase, joystick, obstaclePositions, ballOwner, selectedBall, config, level, botGoals, playerGoals, playSound]);
 
-  // Timer
+  // ── Timer ────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (phase !== 'playing') return;
     const t = setInterval(() => {
       setTimeLeft(prev => {
-        if (prev <= 1) { setPhase('result'); playSound('gameover'); return 0; }
+        if (prev <= 1) { setPhase('result'); return 0; }
         return prev - 1;
       });
     }, 1000);
     return () => clearInterval(t);
   }, [phase]);
 
-  // Joystick handlers melhorados
-  const handleJoyStart = (clientX, clientY) => {
+  // ── Joystick handlers ───────────────────────────────────────────────────
+  const handleJoyStart = (cx, cy) => {
     if (!joyRef.current) return;
     const rect = joyRef.current.getBoundingClientRect();
     const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-    joyCenterRef.current = center;
-    setJoystickCenter(center);
-    const maxDist = 40;
-    const dx = clientX - center.x;
-    const dy = clientY - center.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    const scale = Math.min(distance, maxDist) / maxDist;
+    joyCtrRef.current = center;
+    updateJoy(cx, cy, center);
+  };
+  const updateJoy = (cx, cy, center) => {
+    const c = center || joyCtrRef.current;
+    if (!c) return;
+    const dx = cx - c.x, dy = cy - c.y;
+    const mag = Math.sqrt(dx * dx + dy * dy) || 1;
+    const scale = Math.min(mag, 40) / 40;
     const angle = Math.atan2(dy, dx);
     setJoystick({ x: Math.cos(angle) * scale, y: Math.sin(angle) * scale, active: true });
   };
-
-  const updateJoystick = (clientX, clientY) => {
-    const center = joyCenterRef.current;
-    if (!center) return;
-    const maxDist = 40;
-    const dx = clientX - center.x;
-    const dy = clientY - center.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    const scale = Math.min(distance, maxDist) / maxDist;
-    const angle = Math.atan2(dy, dx);
-    setJoystick({
-      x: Math.cos(angle) * scale,
-      y: Math.sin(angle) * scale,
-      active: true,
-    });
-  };
-
-  const handleJoyMove = (clientX, clientY) => {
-    if (!joystick.active) return;
-    updateJoystick(clientX, clientY);
-  };
-
   const handleJoyEnd = () => {
-    joyCenterRef.current = null;
+    joyCtrRef.current = null;
     setJoystick({ x: 0, y: 0, active: false });
-    setJoystickCenter(null);
   };
 
-  // Handlers de seleção
-  const handleSelectBall = (ball) => {
-    setSelectedBall(ball);
-    playSound('select');
-    setPhase('obstacle-select');
+  // ── Chute ───────────────────────────────────────────────────────────────
+  const handleShoot = () => {
+    if (ballOwner !== 'player') return;
+    // Chuta em direção ao gol do bot (topo)
+    setBallOwner('bot');
+    setShowGoalEffect(true);
+    playSound('shoot');
+    setTimeout(() => setShowGoalEffect(false), 1000);
   };
 
-  const handleToggleObstacle = (obs) => {
-    setSelectedObstacles(prev => {
-      const exists = prev.find(o => o.id === obs.id);
-      if (exists) return prev.filter(o => o.id !== obs.id);
-      return [...prev, obs];
-    });
-    playSound('select');
-  };
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // RENDERIZAÇÃO
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  // Menu
+  // ── Menu principal ────────────────────────────────────────────────────
   if (phase === 'menu') {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[80vh] gap-6 px-4">
-        <motion.div 
-          initial={{ scale: 0.8, opacity: 0 }} 
-          animate={{ scale: 1, opacity: 1 }} 
-          transition={{ type: 'spring', stiffness: 200 }}
-          className="text-center"
-        >
-          <motion.div 
-            animate={{ rotate: [0, 10, -10, 0], y: [0, -10, 0] }} 
-            transition={{ duration: 2, repeat: Infinity }}
-            className="text-6xl mb-2"
-          >⚽</motion.div>
-          <h1 className="font-heading font-black text-3xl text-primary mb-1">Fut de Rua</h1>
-          <p className="text-gray-500 text-sm px-8 text-center">Escolha sua bola, adicione elementos da rua e fuja do marcador!</p>
+      <div className="flex flex-col items-center gap-5 py-4 px-4 min-h-[80vh]">
+        <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center">
+          <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 1.8, repeat: Infinity }} className="text-5xl mb-2">⚽</motion.div>
+          <h1 className="font-heading font-black text-2xl text-primary">Fut de Rua</h1>
+          <p className="text-xs text-muted-foreground">Drible, passes e muitos gols!</p>
         </motion.div>
 
-        <motion.button 
-          whileHover={{ scale: 1.05 }} 
-          whileTap={{ scale: 0.95 }} 
-          onClick={() => { playSound('start'); setPhase('ball-select'); }}
-          className="w-full max-w-xs py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold rounded-2xl shadow-lg text-lg"
-        >
-          Jogar Agora 🎮
-        </motion.button>
-      </div>
-    );
-  }
-
-  // Seleção de bola
-  if (phase === 'ball-select') {
-    return (
-      <div className="flex flex-col items-center gap-4 px-4 py-6">
-        <motion.div 
-          initial={{ y: -20, opacity: 0 }} 
-          animate={{ y: 0, opacity: 1 }}
-          className="text-center mb-2"
-        >
-          <h2 className="font-heading font-bold text-xl text-primary">Escolha sua Bola</h2>
-          <p className="text-gray-500 text-sm">Cada bola tem velocidade diferente</p>
-        </motion.div>
-
-        <div className="grid grid-cols-2 gap-3 w-full max-w-sm">
-          {BALL_TYPES.map((ball, idx) => (
-            <motion.button
-              key={ball.id}
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: idx * 0.05 }}
-              whileHover={{ scale: 1.05, y: -5 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => handleSelectBall(ball)}
-              className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${
-                selectedBall.id === ball.id 
-                  ? 'border-primary bg-gradient-to-br from-primary/20 to-primary/5 shadow-lg' 
-                  : 'border-gray-200 bg-white hover:border-amber-300'
-              }`}
-            >
-              <motion.span 
-                className="text-3xl"
-                animate={{ rotate: selectedBall.id === ball.id ? [0, 15, -15, 0] : 0 }}
-                transition={{ duration: 0.5 }}
-              >{ball.emoji}</motion.span>
-              <span className="font-bold text-sm">{ball.name}</span>
-              <span className="text-[10px] text-gray-500">{ball.desc}</span>
-              <div className="flex gap-0.5 mt-1">
-                {[...Array(Math.round(ball.speed * 5))].map((_, i) => (
-                  <div key={i} className="w-2 h-2 rounded-full bg-amber-400" />
-                ))}
+        {/* Seleção de fase */}
+        <div className="w-full max-w-xs space-y-1.5">
+          <p className="text-xs font-bold text-gray-500 uppercase text-center">Escolha o nível</p>
+          {LEVELS.map((lv, i) => (
+            <motion.button key={i} whileTap={{ scale: 0.97 }}
+              onClick={() => setLevel(i)}
+              className={`w-full py-2.5 px-4 rounded-xl border-2 text-left flex justify-between items-center transition-all ${level === i ? 'border-primary bg-primary/10' : 'border-border/30 bg-card'}`}>
+              <div>
+                <div className="font-bold text-sm">{lv.label}</div>
+                <div className="text-[9px] text-muted-foreground">{lv.desc}</div>
               </div>
+              {level === i && <span className="text-primary font-bold">✓</span>}
             </motion.button>
           ))}
         </div>
-      </div>
-    );
-  }
 
-  // Seleção de obstáculos
-  if (phase === 'obstacle-select') {
-    return (
-      <div className="flex flex-col items-center gap-4 px-4 py-6">
-        <motion.div 
-          initial={{ y: -20, opacity: 0 }} 
-          animate={{ y: 0, opacity: 1 }}
-          className="text-center mb-2"
-        >
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <span className="text-2xl">{selectedBall.emoji}</span>
-            <span className="text-sm text-gray-500">{selectedBall.name}</span>
+        {/* Seleção de bola */}
+        <div className="w-full max-w-xs">
+          <p className="text-xs font-bold text-gray-500 uppercase text-center mb-2">Escolha a bola</p>
+          <div className="grid grid-cols-3 gap-1.5">
+            {BALL_TYPES.map((b) => (
+              <motion.button key={b.id} whileTap={{ scale: 0.9 }}
+                onClick={() => setSelectedBall(b)}
+                className={`p-2 rounded-xl border-2 text-center transition-all ${selectedBall.id === b.id ? 'border-primary bg-primary/10' : 'border-border/30 bg-card'}`}>
+                <div className="text-xl">{b.emoji}</div>
+                <div className="text-[8px] font-bold leading-tight">{b.name}</div>
+              </motion.button>
+            ))}
           </div>
-          <h2 className="font-heading font-bold text-xl text-primary">Elementos da Rua</h2>
-          <p className="text-gray-500 text-sm">Adicione obstáculos (opcional)</p>
-        </motion.div>
-
-        <div className="grid grid-cols-2 gap-3 w-full max-w-sm">
-          {OBSTACLE_TYPES.map((obs, idx) => (
-            <motion.button
-              key={obs.id}
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: idx * 0.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => handleToggleObstacle(obs)}
-              className={`p-3 rounded-xl border-2 flex items-center gap-3 transition-all ${
-                selectedObstacles.find(o => o.id === obs.id) 
-                  ? 'border-primary bg-gradient-to-br from-primary/20 to-primary/5' 
-                  : 'border-gray-200 bg-white'
-              }`}
-            >
-              <span className="text-2xl">{obs.emoji}</span>
-              <div className="text-left">
-                <span className="font-bold text-sm block">{obs.name}</span>
-                <span className="text-[10px] text-gray-500">{obs.desc}</span>
-              </div>
-              {selectedObstacles.find(o => o.id === obs.id) && (
-                <motion.div 
-                  initial={{ scale: 0 }} 
-                  animate={{ scale: 1 }}
-                  className="ml-auto w-5 h-5 rounded-full bg-primary flex items-center justify-center text-white text-xs"
-                >✓</motion.div>
-              )}
-            </motion.button>
-          ))}
         </div>
 
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => { playSound('start'); initLevel(0); }}
-          className="w-full max-w-xs py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold rounded-2xl shadow-lg text-lg mt-4"
-        >
-          Começar! ⚽
+        {/* Seleção de obstáculos */}
+        <div className="w-full max-w-xs">
+          <p className="text-xs font-bold text-gray-500 uppercase text-center mb-2">Elementos da rua (opcional)</p>
+          <div className="grid grid-cols-4 gap-1.5">
+            {OBSTACLE_TYPES.map((o) => (
+              <motion.button key={o.id} whileTap={{ scale: 0.9 }}
+                onClick={() => setSelectedObstacles(prev => {
+                  const ex = prev.find(p => p.id === o.id);
+                  if (ex) return prev.filter(p => p.id !== o.id);
+                  return [...prev, o];
+                })}
+                className={`p-2 rounded-xl border-2 text-center transition-all ${selectedObstacles.find(p => p.id === o.id) ? 'border-primary bg-primary/10' : 'border-border/30 bg-card'}`}>
+                <div className="text-xl">{o.emoji}</div>
+                <div className="text-[8px] font-bold leading-tight">{o.name}</div>
+              </motion.button>
+            ))}
+          </div>
+        </div>
+
+        <motion.button whileTap={{ scale: 0.95 }}
+          onClick={() => initLevel(level)}
+          className="w-full max-w-xs py-4 bg-gradient-to-r from-primary to-pink-500 text-white font-heading font-black text-lg rounded-2xl shadow-lg">
+          Jogar! ⚽
         </motion.button>
       </div>
     );
   }
 
-  // Jogo
-  if (phase === 'playing' || phase === 'goal') {
+  // ── Resultado ──────────────────────────────────────────────────────────
+  if (phase === 'result') {
+    const userWon = winner === 'player';
     return (
-      <div className="flex flex-col items-center gap-3 p-2">
-        {/* HUD */}
-        <div className="flex justify-between items-center w-full max-w-sm px-2">
-          <div className="flex items-center gap-1">
+      <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
+        className="flex flex-col items-center justify-center min-h-[70vh] gap-5 px-4">
+        <motion.div animate={{ rotate: userWon ? [0, 10, -10, 0] : 0 }} transition={{ repeat: Infinity, duration: 1 }}
+          className="text-7xl">{userWon ? '🏆' : '😢'}</motion.div>
+        <div className="text-center">
+          <h2 className="font-heading font-black text-2xl mb-1">{userWon ? 'Você venceu!' : 'O bot venceu!'}</h2>
+          <p className="text-muted-foreground">{playerGoals} × {botGoals}</p>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={() => setPhase('menu')} className="px-6 py-3 bg-muted font-bold rounded-2xl">Menu</button>
+          <button onClick={() => initLevel(level)} className="px-6 py-3 bg-primary text-white font-bold rounded-2xl">Jogar de novo</button>
+        </div>
+      </motion.div>
+    );
+  }
+
+  // ── Jogo ───────────────────────────────────────────────────────────────
+  return (
+    <div className="flex flex-col items-center gap-2 select-none">
+
+      {/* HUD */}
+      <div className="flex items-center justify-between w-full max-w-sm px-1">
+        <div className="bg-card rounded-xl px-3 py-1.5 text-xs font-bold">
+          <span className="text-primary">{playerGoals}</span> × <span className="text-red-500">{botGoals}</span>
+        </div>
+        <div className="bg-primary/10 border border-primary/30 rounded-xl px-3 py-1 text-xs font-bold text-primary">
+          {config.label}
+        </div>
+        <div className={`rounded-xl px-3 py-1.5 text-xs font-bold ${timeLeft <= 10 ? 'text-red-500 animate-pulse' : 'text-muted-foreground'}`}>
+          ⏱ {timeLeft}s
+        </div>
+      </div>
+
+      {/* Campo SVG */}
+      <div className="relative rounded-2xl overflow-hidden shadow-2xl"
+        style={{ width: FIELD_W, height: FIELD_H, background: 'linear-gradient(180deg, #4a4a4a 0%, #5c5c5c 50%, #4a4a4a 100%)' }}>
+
+        {/* Asfalto */}
+        <div className="absolute inset-0 bg-gradient-to-b from-gray-600 via-gray-500 to-gray-600" />
+
+        {/* Linhas do campo */}
+        <svg width={FIELD_W} height={FIELD_H} className="absolute inset-0 opacity-30">
+          <line x1="0" y1={FIELD_H/2} x2={FIELD_W} y2={FIELD_H/2} stroke="white" strokeWidth="1.5" strokeDasharray="8 6" />
+          <circle cx={FIELD_W/2} cy={FIELD_H/2} r="35" stroke="white" strokeWidth="1.5" fill="none" />
+          <line x1={FIELD_W/2} y1="0" x2={FIELD_W/2} y2={FIELD_H} stroke="white" strokeWidth="1" strokeDasharray="4 4" />
+        </svg>
+
+        {/* Gol de cima (DO BOT — bot ataca para cá) */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2">
+          <div className="relative" style={{ width: GOAL_W, height: GOAL_H }}>
+            {/* Rede */}
+            <div className="absolute inset-0 bg-white/10 rounded-b-xl border-4 border-white/60 border-t-0"
+              style={{ borderWidth: '0 4px 4px 4px' }} />
+            {/* Linhas da rede */}
+            {[...Array(6)].map((_, i) => (
+              <div key={`v${i}`} className="absolute top-0 bottom-0 w-px bg-white/20" style={{ left: `${(i+1)*(100/7)}%` }} />
+            ))}
             {[...Array(3)].map((_, i) => (
-              <motion.span 
-                key={i}
-                animate={i >= lives ? { opacity: 0.2 } : { scale: [1, 1.2, 1] }}
-                className="text-lg"
-              >{i < lives ? '❤️' : '🖤'}</motion.span>
+              <div key={`h${i}`} className="absolute left-0 right-0 h-px bg-white/20" style={{ top: `${(i+1)*(100/4)}%` }} />
             ))}
-          </div>
-          
-          <div className="text-center">
-            <div className="font-bold text-primary">{config.label}</div>
-            <div className="flex gap-1 justify-center mt-1">
-              {[...Array(config.goals)].map((_, i) => (
-                <motion.div 
-                  key={i}
-                  initial={false}
-                  animate={{ 
-                    scale: i < goals ? 1.2 : 1,
-                    backgroundColor: i < goals ? '#22c55e' : '#e5e7eb'
-                  }}
-                  className="w-2.5 h-2.5 rounded-full"
-                />
-              ))}
-            </div>
-          </div>
-          
-          <div className="text-right">
-            <div className="font-bold text-lg text-primary">{score}</div>
-            <div className={`text-xs ${timeLeft <= 10 ? 'text-red-500 font-bold' : 'text-gray-500'}`}>
-              {timeLeft}s
-            </div>
+            {/* Trave */}
+            <div className="absolute -top-1 left-0 right-0 h-1.5 bg-white/80 rounded-full" />
+            <div className="absolute top-0 left-0 w-1 h-full bg-white/60 rounded-l" />
+            <div className="absolute top-0 right-0 w-1 h-full bg-white/60 rounded-r" />
+            {/* Chinelos (emoji) */}
+            <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-2xl" style={{ filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.5))' }}>🩴</div>
           </div>
         </div>
 
-        {/* Campo */}
-        <div
-          className="relative rounded-2xl overflow-hidden shadow-2xl"
-          style={{ 
-            width: FIELD_W, 
-            height: FIELD_H, 
-            background: 'linear-gradient(180deg, #4a4a4a 0%, #5c5c5c 50%, #4a4a4a 100%)'
-          }}
-        >
-          {/* Efeito de gol */}
-          <AnimatePresence>
-            {showGoalEffect && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-green-500/40 z-50 flex items-center justify-center"
-              >
-                <motion.div
-                  initial={{ scale: 0, rotate: -180 }}
-                  animate={{ scale: 1, rotate: 0 }}
-                  exit={{ scale: 0, rotate: 180 }}
-                  transition={{ type: 'spring', stiffness: 200 }}
-                  className="text-6xl"
-                >⚽🎉</motion.div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Efeito de colisão */}
-          <AnimatePresence>
-            {showHitEffect && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-red-500/30 z-50"
-              >
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: [1, 1.5, 1] }}
-                  className="absolute inset-0 flex items-center justify-center"
-                >
-                  <div className="text-4xl">💥</div>
-                </motion.div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Linhas do asfalto */}
-          <div className="absolute inset-0 opacity-10">
-            {[...Array(8)].map((_, i) => (
-              <div 
-                key={i} 
-                className="absolute left-0 right-0 h-px bg-white"
-                style={{ top: `${(i + 1) * 12}%` }}
-              />
+        {/* Gol de baixo (DO JOGADOR — bot ataca aqui) */}
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2">
+          <div className="relative" style={{ width: GOAL_W, height: GOAL_H }}>
+            <div className="absolute inset-0 bg-white/10 rounded-t-xl border-4 border-white/60 border-b-0"
+              style={{ borderWidth: '4px 4px 0 4px' }} />
+            {[...Array(6)].map((_, i) => (
+              <div key={`bv${i}`} className="absolute top-0 bottom-0 w-px bg-white/20" style={{ left: `${(i+1)*(100/7)}%` }} />
             ))}
-            {[0.25, 0.5, 0.75].map(p => (
-              <div key={p} className="absolute top-0 bottom-0 w-px bg-white" style={{ left: `${p * 100}%` }} />
+            {[...Array(3)].map((_, i) => (
+              <div key={`bh${i}`} className="absolute left-0 right-0 h-px bg-white/20" style={{ top: `${(i+1)*(100/4)}%` }} />
             ))}
+            <div className="absolute -bottom-1 left-0 right-0 h-1.5 bg-white/80 rounded-full" />
+            <div className="absolute bottom-0 left-0 w-1 h-full bg-white/60 rounded-l" />
+            <div className="absolute bottom-0 right-0 w-1 h-full bg-white/60 rounded-r" />
+            <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-2xl" style={{ filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.5))' }}>🩴</div>
           </div>
+        </div>
 
-          {/* Gol */}
-          <motion.div
-            initial={{ scale: 0.8 }}
-            animate={{ scale: 1 }}
-            className="absolute top-3 left-1/2 transform -translate-x-1/2"
-            style={{
-              width: GOAL_W,
-              height: GOAL_H,
-              background: 'linear-gradient(180deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.1) 100%)',
-              border: '3px solid rgba(255,255,255,0.6)',
-              borderRadius: '8px 8px 0 0',
-              borderBottom: 'none',
-            }}
-          >
-            <motion.div 
-              animate={{ opacity: [0.5, 1, 0.5] }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-              className="absolute inset-0 flex items-center justify-center text-3xl"
-            >🥅</motion.div>
-            <div className="absolute -bottom-1 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-white to-transparent opacity-50" />
+        {/* Obstáculos */}
+        {obstaclePositions.map((obs, i) => (
+          <motion.div key={i}
+            animate={obs.behavior === 'patrol' || obs.behavior === 'slow' ? { x: [obs.x - 20, obs.x + 20, obs.x - 20] } : {}}
+            transition={{ duration: obs.behavior === 'slow' ? 6 : 3, repeat: Infinity, ease: 'easeInOut' }}
+            className="absolute text-3xl"
+            style={{ left: obs.x - 16, top: obs.y - 16, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))' }}>
+            {obs.emoji}
           </motion.div>
+        ))}
 
-          {/* Obstáculos */}
-          {obstaclePositions.map((obs, idx) => (
-            <motion.div
-              key={obs.id}
-              initial={{ scale: 0, y: -50 }}
-              animate={{ scale: 1, y: 0 }}
-              transition={{ delay: idx * 0.1, type: 'spring' }}
-              className="absolute"
-              style={{
-                left: obs.x - 15,
-                top: obs.y - 15,
-                fontSize: 30,
-                filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
-              }}
-            >
-              <motion.div
-                animate={obs.type.behavior === 'patrol' ? { x: [0, 10, 0] } : {}}
-                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-              >
-                {obs.type.emoji}
+        {/* Jogador */}
+        <motion.div animate={{ x: playerPos.x - PLAYER_R, y: playerPos.y - PLAYER_R }}
+          className="absolute w-12 h-12 rounded-full bg-blue-500 border-2 border-white shadow-lg flex items-center justify-center text-white font-black text-xs">
+          ⚽
+        </motion.div>
+
+        {/* Bot (goleiro defensivo) */}
+        <motion.div animate={{ x: botPos.x - BOT_R, y: botPos.y - BOT_R }}
+          className="absolute w-12 h-12 rounded-full bg-red-500 border-2 border-white shadow-lg flex items-center justify-center text-white font-black text-xs">
+          🤖
+        </motion.div>
+
+        {/* Bola */}
+        {ballOwner === 'player' && (
+          <motion.div animate={{ x: ballPos.x - BALL_R, y: ballPos.y - BALL_R }}
+            className="absolute">
+            <div className="text-2xl drop-shadow-md">{selectedBall.emoji}</div>
+          </motion.div>
+        )}
+        {ballOwner === 'bot' && (
+          <motion.div animate={{ x: ballPos.x - BALL_R, y: ballPos.y - BALL_R }}
+            className="absolute">
+            <div className="text-2xl drop-shadow-md">{selectedBall.emoji}</div>
+          </motion.div>
+        )}
+
+        {/* Efeito gol */}
+        <AnimatePresence>
+          {showGoalEffect && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 flex items-center justify-center bg-black/40 z-10">
+              <motion.div animate={{ scale: [0.5, 1.2, 1], rotate: [-10, 10, 0] }} transition={{ duration: 0.4 }}
+                className="text-5xl font-black text-white drop-shadow-lg">
+                ⚽ GOL!
               </motion.div>
             </motion.div>
-          ))}
-
-          {/* Marcador/Bot */}
-          <motion.div
-            className="absolute z-10"
-            style={{ left: botPos.x - BOT_R, top: botPos.y - BOT_R }}
-            animate={{ 
-              scale: dist(playerPos, botPos) < 60 ? [1, 1.1, 1] : 1,
-            }}
-            transition={{ duration: 0.3 }}
-          >
-            <div 
-              className="w-11 h-11 rounded-full flex items-center justify-center text-xl shadow-lg border-2 border-white relative"
-              style={{
-                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                boxShadow: dist(playerPos, botPos) < 60 
-                  ? '0 0 20px rgba(239, 68, 68, 0.8)' 
-                  : '0 4px 10px rgba(0,0,0,0.3)',
-              }}
-            >
-              😤
-              {/* Bola com o bot */}
-              {ballOwner === 'bot' && (
-                <motion.div
-                  className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-sm shadow-md border border-gray-300"
-                  style={{ background: 'white' }}
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
-                >
-                  {selectedBall.emoji}
-                </motion.div>
-              )}
-            </div>
-            {dist(playerPos, botPos) < 80 && (
-              <motion.div
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs font-bold text-red-400 whitespace-nowrap"
-              >
-                ⚠️ Perigo!
-              </motion.div>
-            )}
-          </motion.div>
-
-          {/* Jogador */}
-          <motion.div
-            className="absolute z-20"
-            style={{ left: playerPos.x - PLAYER_R, top: playerPos.y - PLAYER_R }}
-            animate={{ 
-              rotate: joystick.x * 10,
-              scale: joystick.active ? 1.1 : 1,
-            }}
-          >
-            <div 
-              className="w-12 h-12 rounded-full flex items-center justify-center text-2xl shadow-lg border-2 border-white relative"
-              style={{
-                background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                boxShadow: '0 4px 15px rgba(59, 130, 246, 0.5)',
-              }}
-            >
-              👧
-              {/* Bola com o jogador — só mostra quando ballOwner === 'player' */}
-              {ballOwner === 'player' && (
-                <motion.div 
-                  className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-sm shadow-md border border-gray-300"
-                  style={{ background: 'white' }}
-                  animate={{ rotate: joystick.active ? 360 : 0 }}
-                  transition={{ duration: 0.5 }}
-                >
-                  {selectedBall.emoji}
-                </motion.div>
-              )}
-            </div>
-          </motion.div>
-
-          {/* Indicador de direção */}
-          {joystick.active && (
-            <div
-              className="absolute pointer-events-none"
-              style={{
-                left: playerPos.x,
-                top: playerPos.y,
-                width: 40,
-                height: 4,
-                background: 'rgba(59, 130, 246, 0.5)',
-                transform: `rotate(${Math.atan2(joystick.y, joystick.x)}rad)`,
-                transformOrigin: '0 50%',
-                borderRadius: '2px',
-              }}
-            />
           )}
-        </div>
+        </AnimatePresence>
 
-        {/* Joystick */}
-        <div className="flex items-center gap-4"
-        >
-          <div
-            ref={joyRef}
-            className="relative w-32 h-32 rounded-full bg-gray-200/60 border-2 border-gray-300 shadow-inner"
-            onTouchStart={(e) => { e.preventDefault(); handleJoyStart(e.touches[0].clientX, e.touches[0].clientY); }}
-            onTouchMove={(e) => { e.preventDefault(); handleJoyMove(e.touches[0].clientX, e.touches[0].clientY); }}
-            onTouchEnd={(e) => { e.preventDefault(); handleJoyEnd(); }}
-            onMouseDown={(e) => handleJoyStart(e.clientX, e.clientY)}
-            onMouseMove={(e) => handleJoyMove(e.clientX, e.clientY)}
-            onMouseUp={handleJoyEnd}
-            onMouseLeave={handleJoyEnd}
-          >
-            <motion.div
-              className="absolute w-12 h-12 rounded-full bg-gradient-to-br from-primary to-green-600 shadow-lg border-2 border-white"
-              style={{
-                left: '50%',
-                top: '50%',
-              }}
-              animate={{
-                x: joystick.x * 30 - 24,
-                y: joystick.y * 30 - 24,
-                scale: joystick.active ? 1.1 : 1,
-              }}
-              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-            />
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <span className="text-gray-400 text-xs">{joystick.active ? '' : 'Arraste'}</span>
-            </div>
-          </div>
-
-          <div className="text-center"
-        >
-            <p className="text-xs text-gray-500 font-medium">{config.desc}</p>
-            <div className="flex items-center gap-2 mt-2"
-        >
-              <button
-                onClick={() => setSoundEnabled(!soundEnabled)}
-                className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
-              >
-                {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-              </button>
-              <button
-                onClick={() => setPhase('menu')}
-                className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {ballOwner === 'player' && playerPos.y < FIELD_H / 2 && phase === 'playing' && (
-          <motion.button
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            whileTap={{ scale: 0.85 }}
-            onClick={() => {
-              // Simula chute: move bola em direção ao centro do gol
-              setPlayerPos({ x: FIELD_W / 2, y: FIELD_H - 80 });
-              setGoals(g => g + 1);
-              setScore(s => s + (level + 1) * 15);
-              setShowGoalEffect(true);
-              playSound('win');
-              setTimeout(() => setShowGoalEffect(false), 1500);
-            }}
-            className="w-full max-w-xs py-4 rounded-2xl font-heading font-bold text-xl text-white shadow-xl bg-gradient-to-r from-green-500 to-emerald-600"
-          >
-            ⚽ CHUTAR!
-          </motion.button>
-        )}
+        {/* Efeito hit */}
+        <AnimatePresence>
+          {showHitEffect && (
+            <motion.div initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+              <div className="text-4xl">💥</div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-    );
-  }
 
-  // Resultado
-  return (
-    <div className="flex flex-col items-center justify-center min-h-[80vh] gap-6 px-4">
-      <motion.div
-        initial={{ scale: 0, rotate: -180 }}
-        animate={{ scale: 1, rotate: 0 }}
-        transition={{ type: 'spring', stiffness: 200 }}
-        className="text-center"
-      >
-        <motion.div 
-          className="text-7xl mb-4"
-          animate={goals >= config.goals ? { rotate: [0, 15, -15, 0], scale: [1, 1.2, 1] } : {}}
-          transition={{ duration: 0.5, repeat: goals >= config.goals ? Infinity : 0 }}
-        >
-          {goals >= config.goals ? '🏆' : '⏰'}
-        </motion.div>
-        <h2 className="font-heading font-black text-3xl text-primary mb-2"
-        >
-          {goals >= config.goals ? 'Vitória!' : 'Tempo Esgotado'}
-        </h2>
-        <p className="text-gray-500"
-        >
-          {goals >= config.goals ? 'Você dominou a rua!' : 'Tente novamente!'}
-        </p>
-      </motion.div>
+      {/* Indicador de posse */}
+      <div className={`px-4 py-1.5 rounded-full text-xs font-bold ${ballOwner === 'player' ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'}`}>
+        {ballOwner === 'player' ? '⚽ Você tem a bola' : '🤖 Bot tem a bola'}
+      </div>
 
-      <motion.div 
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.2 }}
-        className="bg-white rounded-2xl p-6 w-full max-w-xs shadow-xl"
-      >
-        <div className="text-5xl font-black text-primary text-center mb-2">{score}</div>
-        <div className="text-sm text-gray-500 text-center mb-4">pontos</div>
-        
-        <div className="flex justify-around text-sm"
-        >
-          <div className="text-center"
-          >
-            <div className="font-bold text-lg">{level + 1}</div>
-            <div className="text-xs text-gray-400">Nível</div>
-          </div>
-          <div className="text-center"
-          >
-            <div className="font-bold text-lg">{goals}</div>
-            <div className="text-xs text-gray-400">Gols</div>
-          </div>
-          <div className="text-center"
-          >
-            <div className="font-bold text-lg">{3 - lives}</div>
-            <div className="text-xs text-gray-400">Erros</div>
-          </div>
+      {/* Controles */}
+      <div className="flex items-center gap-4 py-2">
+        {/* Joystick */}
+        <div ref={joyRef}
+          className="w-28 h-28 rounded-full bg-black/20 border-4 border-white/30 relative flex items-center justify-center touch-none"
+          onTouchStart={(e) => { e.preventDefault(); handleJoyStart(e.touches[0].clientX, e.touches[0].clientY); }}
+          onTouchMove={(e)  => { e.preventDefault(); updateJoy(e.touches[0].clientX, e.touches[0].clientY, null); }}
+          onTouchEnd={(e)   => { e.preventDefault(); handleJoyEnd(); }}
+          onMouseDown={(e)  => handleJoyStart(e.clientX, e.clientY)}
+          onMouseMove={(e)  => e.buttons === 1 && updateJoy(e.clientX, e.clientY, null)}
+          onMouseUp={handleJoyEnd}>
+          <motion.div
+            animate={{ x: joystick.x * 28, y: joystick.y * 28 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+            className="w-10 h-10 rounded-full bg-white/80 shadow-lg" />
         </div>
-      </motion.div>
 
-      <div className="flex gap-3 w-full max-w-xs"
-      >
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setPhase('menu')}
-          className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors"
-        >
-          Menu
+        {/* Botão chutar — SEMPRE visível quando é a vez do jogador */}
+        <motion.button whileTap={{ scale: 0.88 }}
+          onClick={handleShoot}
+          disabled={ballOwner !== 'player'}
+          className={`px-6 py-4 rounded-2xl font-heading font-black text-base shadow-xl transition-all ${ballOwner === 'player'
+            ? 'bg-gradient-to-br from-green-400 to-emerald-600 text-white'
+            : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}>
+          ⚽ CHUTAR!
         </motion.button>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => initLevel(0)}
-          className="flex-1 py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold rounded-xl shadow-lg"
-        >
-          Jogar Novamente
-        </motion.button>
+
+        {/* Som / Voltar */}
+        <div className="flex flex-col gap-2">
+          <button onClick={() => setSoundEnabled(s => !s)}
+            className="p-2 rounded-full bg-muted hover:bg-muted/70 transition-colors">
+            {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+          </button>
+          <button onClick={() => { cancelAnimationFrame(rafRef.current); setPhase('menu'); }}
+            className="p-2 rounded-full bg-muted hover:bg-muted/70 transition-colors">
+            <RotateCcw className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </div>
   );
