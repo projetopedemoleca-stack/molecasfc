@@ -286,6 +286,18 @@ export default function Profile() {
   const [showEditor, setShowEditor] = useState(false);
   const [showTeamAnim, setShowTeamAnim] = useState(false);
 
+  const cp = profile?.customPlayer || {};
+  const skinTone    = SKIN_TONES.find(s => s.id === cp.skinTone)    || SKIN_TONES[1];
+  const hairColor   = HAIR_COLORS.find(h => h.id === cp.hairColor)  || HAIR_COLORS[0];
+  const hairStyle   = HAIR_STYLES.find(h => h.id === cp.hairStyle)  || HAIR_STYLES[2];
+  const uniformColor = cp.uniformColor || '#E91E63';
+  const shortsColor  = cp.shortsColor  || '#212121';
+  const bootsColor   = cp.bootsColor   || '#FFD600';
+  const jerseyNum    = cp.jerseyNumber  || 10;
+  const playerName   = cp.playerName   || 'Minha Jogadora';
+  const xp    = Number(profile?.globalXP) || 0;
+  const level = Math.floor(xp / 100) + 1;
+
   const handleSaveCustomPlayer = (data) => {
     const updated = { ...profile, customPlayer: data };
     saveProfile(updated);
@@ -411,7 +423,10 @@ export default function Profile() {
               >
                 <div className="text-center">
                   <motion.div
-                    animate={{ scale: [1, 1.3, 1, 1.3, 1], rotate: [-5, 5, -5, 5, 0] }} />
+                    animate={{ scale: [1, 1.3, 1, 1.3, 1], rotate: [-5, 5, -5, 5, 0] }}
+                    transition={{ duration: 0.8 }}
+                    className="text-6xl"
+                  >❤️</motion.div>
                   <motion.p
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
@@ -421,8 +436,10 @@ export default function Profile() {
                     {profile.favoriteTeam}! ❤️
                   </motion.p>
                   <motion.div
+                    animate={{ y: [0, -20, 0, -15, 0], rotate: [0, 10, -10, 0] }}
+                    transition={{ duration: 1.2, repeat: Infinity }}
                     className="mt-2 text-4xl"
-                    animate={{ y: [0, -20, 0, -15, 0] }} />
+                  >{TEAM_EMOJIS[profile.favoriteTeam] || '❤️'}</motion.div>
                 </div>
               </motion.div>
             )}
