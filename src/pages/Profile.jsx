@@ -86,6 +86,14 @@ function PlayerEditor({ profile, onSave, onClose }) {
   const [jerseyNum,    setJerseyNum]    = useState(cp.jerseyNumber  || 10);
   const [teamName,     setTeamName]     = useState(cp.teamName      || '');
 
+  const steps = [
+    { label: 'Nome',     icon: '✏️' },
+    { label: 'Pele',     icon: '🎨' },
+    { label: 'Cabelo',   icon: '💇‍♀️' },
+    { label: 'Uniforme', icon: '👕' },
+    { label: 'Detalhes', icon: '⚙️' },
+  ];
+
   const handleSave = () => {
     onSave({
       playerName,
