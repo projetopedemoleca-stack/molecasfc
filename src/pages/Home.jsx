@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Play, Trophy, BookOpen, User, Star } from 'lucide-react';
 import PlayerAvatar from '@/components/game/PlayerAvatar';
+import CustomAvatar, { SKIN_TONES, HAIR_COLORS, HAIR_STYLES } from '@/components/game/CustomAvatar';
 import { PLAYERS } from '@/lib/gameData';
 import { loadProfile } from '@/lib/playerProfile';
 
@@ -67,10 +68,13 @@ const menuItems = [
 
 export default function Home() {
   const profile = loadProfile();
-  const selectedPlayer = PLAYERS.find(p => p.id === (profile.selectedPlayerId || 'luna')) || PLAYERS[0];
-  const uniformColor = profile.uniformColor || '#E91E63';
-  const shortsColor  = profile.shortsColor  || '#000000';
-  const bootsColor   = profile.bootsColor   || '#FFD600';
+  const cp = profile?.customPlayer || {};
+  const hasCustom = !!(cp.playerName);
+
+  // Resolve custom player settings
+  const skinObj  = SKIN_TONES.find(s => s.id === cp.skinTone)   || SKIN_TONES[1];
+  const hairObj  = HAIR_COLORS.find(h => h.id === cp.hairColor)  || HAIR_COLORS[0];
+  const styleObj = HAIR_STYLES.find(h => h.id === cp.hairStyle)  || HAIR_STYLES[2];
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary/30 via-background to-accent/10 flex flex-col items-center px-4 pt-10 pb-8 font-body overflow-x-hidden">
@@ -112,19 +116,32 @@ export default function Home() {
           transition={{ repeat: Infinity, duration: 2.4, ease: 'easeInOut' }}
           className="relative"
         >
-          <div className="absolute inset-0 rounded-full blur-2xl opacity-30" style={{ background: uniformColor }}/>
-          <div className="relative bg-gradient-to-b from-primary/15 to-accent/15 rounded-3xl p-3 shadow-xl border border-white/20 flex items-center justify-center">
-            <PlayerAvatar
-              player={selectedPlayer}
-              uniformColor={uniformColor}
-              shortsColor={shortsColor}
-              bootsColor={bootsColor}
-              size="lg"
-            />
+          <div className="absolute inset-0 rounded-full blur-2xl opacity-30" style={{ background: hasCustom ? cp.uniformColor : '#E91E63' }}/>
+          <div className="relative bg-gradient-to-b from-primary/15 to-accent/15 rounded-3xl p-3 shadow-xl border border-white/20 flex items-center justify-center overflow-hidden" style={{ width: 88, height: 88 }}>
+            {hasCustom ? (
+              <CustomAvatar
+                skin={skinObj}
+                hairColor={hairObj}
+                hairStyle={styleObj}
+                uniformColor={cp.uniformColor || '#E91E63'}
+                shortsColor={cp.shortsColor  || '#212121'}
+                bootsColor={cp.bootsColor   || '#FFD600'}
+                number={cp.jerseyNumber || 10}
+                size={80}
+              />
+            ) : (
+              <PlayerAvatar
+                player={PLAYERS.find(p => p.id === (profile.selectedPlayerId || 'luna')) || PLAYERS[0]}
+                uniformColor={profile?.uniformColor || '#E91E63'}
+                shortsColor={profile?.shortsColor  || '#000000'}
+                bootsColor={profile?.bootsColor   || '#FFD600'}
+                size="lg"
+              />
+            )}
           </div>
         </motion.div>
         <p className="text-xs text-muted-foreground mt-1 font-semibold">
-          {selectedPlayer.name} · {selectedPlayer.position}
+          {hasCustom ? (cp.playerName || 'Minha Jogadora') : (PLAYERS.find(p => p.id === (profile.selectedPlayerId || 'luna'))?.name || 'Jogadora')}
         </p>
       </motion.div>
 
