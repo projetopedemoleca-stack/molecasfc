@@ -3,11 +3,11 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Check, Sparkles, Palette } from 'lucide-react';
 import { PLAYERS, TEAMS } from '@/lib/gameData';
+import CustomAvatar, { SKIN_TONES, HAIR_COLORS, HAIR_STYLES } from '@/components/game/CustomAvatar';
+import PlayerAvatar from '@/components/game/PlayerAvatar';
 import { getAbility } from '@/lib/playerAbilities';
 import { loadProfile, saveProfile, isPlayerUnlocked, isTeamUnlocked, getGlobalLevel, getLevelInfo, getPlayerUnlockLevel } from '@/lib/playerProfile';
 import { audio } from '@/lib/audioEngine';
-import PlayerAvatar from '@/components/game/PlayerAvatar';
-import CustomAvatar, { SKIN_TONES, HAIR_COLORS, HAIR_STYLES } from '@/components/game/CustomAvatar';
 
 // ─── Color palettes ──────────────────────────────────────────────
 const UNIFORM_COLORS = [
@@ -109,6 +109,10 @@ export default function CharacterSelect() {
   try { profile = loadProfile() || {}; } catch { profile = {}; }
   const customPlayer = profile?.customPlayer;
   const hasCustomPlayer = customPlayer?.playerName;
+
+  const skinObj  = customPlayer?.skinTone  ? (SKIN_TONES.find(s  => s.id  === customPlayer.skinTone)  || SKIN_TONES[1])  : SKIN_TONES[1];
+  const hairObj  = customPlayer?.hairColor ? (HAIR_COLORS.find(h => h.id === customPlayer.hairColor) || HAIR_COLORS[0]) : HAIR_COLORS[0];
+  const styleObj = customPlayer?.hairStyle ? (HAIR_STYLES.find(h => h.id === customPlayer.hairStyle) || HAIR_STYLES[2]) : HAIR_STYLES[2];
 
   const [selectedId, setSelectedId] = useState(profile.selectedPlayerId || 'luna');
   const [shirtColor, setShirtColor] = useState(profile.uniformColor || '#E91E63');
