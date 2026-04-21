@@ -43,6 +43,14 @@ const MEDALS = [
 // """""""""""""""""""""""""""""""""""""""""""""""""""
 // BARRA XP
 // """""""""""""""""""""""""""""""""""""""""""""""""""
+const TEAM_EMOJIS = {
+  'Flamengo': '🔴', 'Corinthians': '⚫', 'São Paulo': '🔴', 'Palmeiras': '🟢',
+  'Santos': '⚪', 'Vasco': '⚫', 'Fluminense': '⚽', 'Botafogo': '⚫',
+  'Grêmio': '🔵', 'Internacional': '🔴', 'Cruzeiro': '🔵', 'Atlético-MG': '⚫',
+  'Bahia': '⚽', 'Sport': '🔴', 'Fortaleza': '🔵', 'Ceará': '⚫',
+  'Athletico-PR': '🔴', 'Coritiba': '🟢', 'São Paulo ( Feminino )': '⚽',
+};
+
 function XPBar({ xp }) {
   const level = Math.floor(xp / XP_PER_LEVEL) + 1;
   const currentXP = xp % XP_PER_LEVEL;
