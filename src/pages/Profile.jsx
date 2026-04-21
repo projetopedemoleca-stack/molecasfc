@@ -405,9 +405,9 @@ export default function Profile() {
             {/* Stats de partida */}
             <div className="grid grid-cols-3 gap-2 mt-3">
               {[
-                { label: 'Partidas', value: profile.stats?.matches || 0, emoji: 'a' },
-                { label: 'Vitórias',  value: profile.stats?.wins    || 0, emoji: 'x ' },
-                { label: 'Win%',      value: profile.stats?.matches ? winRate + '%' : '', emoji: 'x`' },
+                { label: 'Partidas', value: profile.stats?.matches || 0, emoji: '⚽' },
+                { label: 'Vitórias',  value: profile.stats?.wins    || 0, emoji: '🏆' },
+                { label: 'Win%',      value: profile.stats?.matches ? winRate + '%' : '-', emoji: '📊' },,
               ].map(({ label, value, emoji }) => (
                 <div key={label} className="bg-muted rounded-xl p-2 text-center">
                   <span className="text-base block">{emoji}</span>
