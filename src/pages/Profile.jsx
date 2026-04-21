@@ -286,6 +286,19 @@ export default function Profile() {
   const [showEditor, setShowEditor] = useState(false);
   const [showTeamAnim, setShowTeamAnim] = useState(false);
   const [heartAnimation, setHeartAnimation] = useState(false);
+  const [teamInput, setTeamInput] = useState(profile?.favoriteTeam || '');
+  const [editingTeam, setEditingTeam] = useState(false);
+
+  const handleSaveTeam = () => {
+    const trimmed = teamInput.trim();
+    if (!trimmed) return;
+    const updated = { ...profile, favoriteTeam: trimmed };
+    saveProfile(updated);
+    setProfile(updated);
+    setEditingTeam(false);
+    setHeartAnimation(true);
+    setTimeout(() => setHeartAnimation(false), 2500);
+  };
 
   const cp = profile?.customPlayer || {};
   const skinTone    = SKIN_TONES.find(s => s.id === cp.skinTone)    || SKIN_TONES[1];
