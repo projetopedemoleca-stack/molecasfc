@@ -67,14 +67,15 @@ const menuItems = [
 ];
 
 export default function Home() {
-  const profile = loadProfile();
-  const cp = profile?.customPlayer || {};
-  const hasCustom = !!(cp.playerName);
+  let profile = {};
+  try { profile = loadProfile() || {}; } catch { profile = {}; }
+  const cp = (profile && profile.customPlayer) ? profile.customPlayer : {};
+  const hasCustom = !!(cp && cp.playerName);
 
-  // Resolve custom player settings
-  const skinObj  = SKIN_TONES.find(s => s.id === cp.skinTone)   || SKIN_TONES[1];
-  const hairObj  = HAIR_COLORS.find(h => h.id === cp.hairColor)  || HAIR_COLORS[0];
-  const styleObj = HAIR_STYLES.find(h => h.id === cp.hairStyle)  || HAIR_STYLES[2];
+  // Resolve custom player settings safely
+  const skinObj  = (cp && cp.skinTone)   ? (SKIN_TONES.find(s => s.id === cp.skinTone)   || SKIN_TONES[1]) : SKIN_TONES[1];
+  const hairObj  = (cp && cp.hairColor)  ? (HAIR_COLORS.find(h => h.id === cp.hairColor)  || HAIR_COLORS[0]) : HAIR_COLORS[0];
+  const styleObj = (cp && cp.hairStyle)  ? (HAIR_STYLES.find(h => h.id === cp.hairStyle)  || HAIR_STYLES[2]) : HAIR_STYLES[2];
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary/30 via-background to-accent/10 flex flex-col items-center px-4 pt-10 pb-8 font-body overflow-x-hidden">
