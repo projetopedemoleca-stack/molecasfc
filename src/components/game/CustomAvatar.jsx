@@ -59,92 +59,124 @@ export default function CustomAvatar({
   const bColor   = bootsColor    || '#FFD600';
 
   const hairTop = {
+    // 1 — Curto com Franja (bangs frisado)
     hs1: (
       <>
-        <rect x="36" y="12" width="48" height="16" rx="8" fill={hColor} />
-        <rect x="36" y="20" width="48" height="8" fill={hColor} />
-        <rect x="32" y="22" width="12" height="12" rx="4" fill={hColor} />
-        <rect x="76" y="22" width="12" height="12" rx="4" fill={hColor} />
-        <rect x="36" y="26" width="22" height="8" rx="4" fill={hColor} opacity="0.7" />
+        <rect x="34" y="11" width="52" height="18" rx="9" fill={hColor} />
+        <rect x="30" y="20" width="12" height="14" rx="6" fill={hColor} />
+        <rect x="78" y="20" width="12" height="14" rx="6" fill={hColor} />
+        {/* Franja reta na testa */}
+        <rect x="38" y="18" width="44" height="8" rx="4" fill={hColor} opacity="0.85" />
+        <rect x="40" y="20" width="40" height="5" rx="2" fill={hColor} opacity="0.5" />
       </>
     ),
+    // 2 — Bob Curto (semelhante ao longo liso mas no ombro)
     hs2: (
       <>
-        <rect x="32" y="10" width="56" height="20" rx="10" fill={hColor} />
-        <rect x="30" y="22" width="10" height="24" rx="5" fill={hColor} />
-        <rect x="80" y="22" width="10" height="24" rx="5" fill={hColor} />
-        <rect x="32" y="28" width="56" height="10" rx="5" fill={hColor} opacity="0.6" />
+        <rect x="30" y="10" width="60" height="22" rx="11" fill={hColor} />
+        <rect x="28" y="20" width="12" height="30" rx="6" fill={hColor} />
+        <rect x="80" y="20" width="12" height="30" rx="6" fill={hColor} />
+        <rect x="34" y="26" width="52" height="8" rx="4" fill={hColor} opacity="0.55" />
       </>
     ),
+    // 3 — Longo Liso (liso passando os ombros)
     hs3: (
       <>
-        <rect x="31" y="10" width="58" height="20" rx="10" fill={hColor} />
-        <rect x="28" y="22" width="12" height="38" rx="6" fill={hColor} />
-        <rect x="80" y="22" width="12" height="38" rx="6" fill={hColor} />
-        <rect x="38" y="26" width="44" height="6" rx="3" fill={hColor} opacity="0.5" />
+        <rect x="29" y="9"  width="62" height="22" rx="11" fill={hColor} />
+        <rect x="25" y="20" width="14" height="44" rx="7" fill={hColor} />
+        <rect x="81" y="20" width="14" height="44" rx="7" fill={hColor} />
+        <rect x="37" y="26" width="46" height="7" rx="3" fill={hColor} opacity="0.45" />
+        {/* Peso do cabelo liso caindo */}
+        <ellipse cx="32" cy="64" rx="8" ry="4" fill={hColor} opacity="0.3" />
+        <ellipse cx="88" cy="64" rx="8" ry="4" fill={hColor} opacity="0.3" />
       </>
     ),
+    // 4 — Cachos (cachos definidos e volumosos)
     hs4: (
       <>
-        {/* Base do cabelo no topo */}
-        <ellipse cx="60" cy="16" rx="28" ry="13" fill={hColor} />
-        {/* Cachos laterais esquerdos */}
-        <circle cx="33" cy="24" r="9" fill={hColor} />
-        <circle cx="30" cy="34" r="7" fill={hColor} />
-        <circle cx="34" cy="43" r="6" fill={hColor} />
-        {/* Cachos laterais direitos */}
-        <circle cx="87" cy="24" r="9" fill={hColor} />
-        <circle cx="90" cy="34" r="7" fill={hColor} />
-        <circle cx="86" cy="43" r="6" fill={hColor} />
-        {/* Fios na frente */}
-        <circle cx="45" cy="20" r="6" fill={hColor} opacity="0.8" />
-        <circle cx="60" cy="18" r="7" fill={hColor} opacity="0.8" />
-        <circle cx="75" cy="20" r="6" fill={hColor} opacity="0.8" />
+        {/* Volume principal */}
+        <ellipse cx="60" cy="15" rx="30" ry="15" fill={hColor} />
+        {/* Cachos esquerda — formato de mola */}
+        <ellipse cx="33" cy="22" rx="11" ry="9"  fill={hColor} />
+        <ellipse cx="29" cy="33" rx="10" ry="8"  fill={hColor} />
+        <ellipse cx="32" cy="44" rx="9"  ry="7"  fill={hColor} />
+        <ellipse cx="36" cy="53" rx="7"  ry="6"  fill={hColor} />
+        {/* Cachos direita */}
+        <ellipse cx="87" cy="22" rx="11" ry="9"  fill={hColor} />
+        <ellipse cx="91" cy="33" rx="10" ry="8"  fill={hColor} />
+        <ellipse cx="88" cy="44" rx="9"  ry="7"  fill={hColor} />
+        <ellipse cx="84" cy="53" rx="7"  ry="6"  fill={hColor} />
+        {/* Cachos topo */}
+        <ellipse cx="48" cy="12" rx="8" ry="7" fill={hColor} />
+        <ellipse cx="60" cy="10" rx="9" ry="7" fill={hColor} />
+        <ellipse cx="72" cy="12" rx="8" ry="7" fill={hColor} />
+        <ellipse cx="60" cy="18" rx="7" ry="6" fill={hColor} opacity="0.7" />
       </>
     ),
+    // 5 — Rabo de Cavalo Alto (arco elegante)
     hs5: (
       <>
-        {/* Base do cabelo */}
-        <rect x="34" y="14" width="52" height="14" rx="7" fill={hColor} />
-        {/* Laterais cobrindo as orelhas */}
-        <rect x="30" y="20" width="12" height="16" rx="6" fill={hColor} />
-        <rect x="78" y="20" width="12" height="16" rx="6" fill={hColor} />
-        {/* Elástico no topo */}
-        <circle cx="60" cy="14" r="6" fill={hColor} />
-        {/* Haste do rabo de cavalo */}
-        <rect x="57" y="6" width="6" height="28" rx="3" fill={hColor} />
-        {/* Ponta do rabo — caindo */}
-        <path d="M57 34 Q50 46 53 56" stroke={hColor} strokeWidth="5" fill="none" strokeLinecap="round" />
-        <path d="M63 34 Q70 46 67 56" stroke={hColor} strokeWidth="5" fill="none" strokeLinecap="round" />
-        {/* Volume no topo */}
-        <ellipse cx="60" cy="10" rx="12" ry="7" fill={hColor} opacity="0.7" />
+        {/* Base no topo */}
+        <ellipse cx="60" cy="13" rx="26" ry="13" fill={hColor} />
+        {/* Laterais */}
+        <rect x="30" y="18" width="12" height="16" rx="6" fill={hColor} />
+        <rect x="78" y="18" width="12" height="16" rx="6" fill={hColor} />
+        {/* Arco do rabo */}
+        <path d="M50 8 Q60 -2 70 8" stroke={hColor} strokeWidth="7" fill="none" strokeLinecap="round" />
+        {/* Rabo caindo com curva suave */}
+        <path d="M54 10 Q48 22 46 38" stroke={hColor} strokeWidth="10" fill="none" strokeLinecap="round" />
+        <path d="M66 10 Q72 22 74 38" stroke={hColor} strokeWidth="10" fill="none" strokeLinecap="round" />
+        {/* Ponta do rabo */}
+        <ellipse cx="46" cy="42" rx="8" ry="5" fill={hColor} opacity="0.8" />
+        <ellipse cx="74" cy="42" rx="8" ry="5" fill={hColor} opacity="0.8" />
+        {/* Elástico */}
+        <rect x="54" y="6"  width="12" height="5" rx="2.5" fill={hColor} opacity="0.6" />
       </>
     ),
+    // 6 — Tranças (两个 tranças laterais estilo box braids)
     hs6: (
       <>
-        <rect x="33" y="12" width="54" height="16" rx="8" fill={hColor} />
-        <rect x="33" y="24" width="9" height="32" rx="4" fill={hColor} />
-        <rect x="78" y="24" width="9" height="32" rx="4" fill={hColor} />
-        <rect x="35" y="30" width="5" height="4" rx="2" fill="rgba(255,255,255,0.25)" />
-        <rect x="35" y="38" width="5" height="4" rx="2" fill="rgba(255,255,255,0.25)" />
-        <rect x="80" y="30" width="5" height="4" rx="2" fill="rgba(255,255,255,0.25)" />
-        <rect x="80" y="38" width="5" height="4" rx="2" fill="rgba(255,255,255,0.25)" />
+        <rect x="30" y="9"  width="60" height="20" rx="10" fill={hColor} />
+        {/* Trança esquerda */}
+        <rect x="28" y="20" width="12" height="40" rx="6" fill={hColor} />
+        <rect x="30" y="24" width="8"  height="3"  rx="1.5" fill="rgba(255,255,255,0.22)" />
+        <rect x="30" y="31" width="8"  height="3"  rx="1.5" fill="rgba(255,255,255,0.22)" />
+        <rect x="30" y="38" width="8"  height="3"  rx="1.5" fill="rgba(255,255,255,0.22)" />
+        <rect x="30" y="45" width="8"  height="3"  rx="1.5" fill="rgba(255,255,255,0.22)" />
+        <rect x="30" y="52" width="8"  height="3"  rx="1.5" fill="rgba(255,255,255,0.22)" />
+        {/* Trança direita */}
+        <rect x="80" y="20" width="12" height="40" rx="6" fill={hColor} />
+        <rect x="82" y="24" width="8"  height="3"  rx="1.5" fill="rgba(255,255,255,0.22)" />
+        <rect x="82" y="31" width="8"  height="3"  rx="1.5" fill="rgba(255,255,255,0.22)" />
+        <rect x="82" y="38" width="8"  height="3"  rx="1.5" fill="rgba(255,255,255,0.22)" />
+        <rect x="82" y="45" width="8"  height="3"  rx="1.5" fill="rgba(255,255,255,0.22)" />
+        <rect x="82" y="52" width="8"  height="3"  rx="1.5" fill="rgba(255,255,255,0.22)" />
       </>
     ),
+    // 7 — Afro (volumoso e definido)
     hs7: (
       <>
-        <ellipse cx="60" cy="16" rx="32" ry="18" fill={hColor} />
-        <ellipse cx="60" cy="22" rx="26" ry="12" fill={hColor} opacity="0.4" />
-        <circle cx="38" cy="26" r="10" fill={hColor} />
-        <circle cx="82" cy="26" r="10" fill={hColor} />
+        <ellipse cx="60" cy="15" rx="35" ry="19" fill={hColor} />
+        <ellipse cx="60" cy="21" rx="28" ry="13" fill={hColor} opacity="0.35" />
+        <circle  cx="38" cy="26" r="12" fill={hColor} />
+        <circle  cx="82" cy="26" r="12" fill={hColor} />
+        <circle  cx="60" cy="9"  r="10" fill={hColor} />
+        <circle  cx="48" cy="10" r="8"  fill={hColor} />
+        <circle  cx="72" cy="10" r="8"  fill={hColor} />
+        {/* Detalhe de textura */}
+        <circle cx="60" cy="13" r="6" fill={hColor} opacity="0.5" />
       </>
     ),
+    // 8 — Pixie Curto (despojado e moderno)
     hs8: (
       <>
-        <rect x="36" y="14" width="48" height="12" rx="6" fill={hColor} />
-        <rect x="32" y="20" width="10" height="10" rx="4" fill={hColor} />
-        <rect x="78" y="20" width="10" height="10" rx="4" fill={hColor} />
-        <rect x="36" y="22" width="20" height="6" rx="3" fill={hColor} opacity="0.7" />
+        <ellipse cx="60" cy="13" rx="28" ry="14" fill={hColor} />
+        <rect x="28" y="18" width="12" height="12" rx="6" fill={hColor} />
+        <rect x="80" y="18" width="12" height="12" rx="6" fill={hColor} />
+        {/* Franja lateral estilo pixie */}
+        <path d="M44 16 Q40 22 44 28" stroke={hColor} strokeWidth="6" fill="none" strokeLinecap="round" />
+        <path d="M76 16 Q80 22 76 28" stroke={hColor} strokeWidth="6" fill="none" strokeLinecap="round" />
+        <ellipse cx="60" cy="11" rx="16" ry="8" fill={hColor} opacity="0.7" />
       </>
     ),
   };
