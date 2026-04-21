@@ -285,6 +285,7 @@ export default function Profile() {
   const [profile, setProfile]     = useState(loadProfile());
   const [showEditor, setShowEditor] = useState(false);
   const [showTeamAnim, setShowTeamAnim] = useState(false);
+  const [heartAnimation, setHeartAnimation] = useState(false);
 
   const cp = profile?.customPlayer || {};
   const skinTone    = SKIN_TONES.find(s => s.id === cp.skinTone)    || SKIN_TONES[1];
