@@ -535,8 +535,8 @@ export default function Profile() {
                     className="text-3xl mb-1"
                     animate={unlocked ? { rotate: [0, 15, -15, 0], scale: [1, 1.2, 1] } : {}}
                     transition={{ duration: 0.5, repeat: unlocked ? Infinity : 0, repeatDelay: 3 }}
-                  >{m.emoji}</motion.div>
-                  <div className="text-[10px] text-muted-foreground">{m.name}</div>
+                  >{medal.emoji}</motion.div>
+                  <div className="text-[10px] text-muted-foreground">{medal.name}</div>
                   {!unlocked && (
                     <div className="absolute inset-0 flex items-center justify-center bg-background/60 rounded-2xl">
                       <Lock className="w-4 h-4 text-muted-foreground" />
