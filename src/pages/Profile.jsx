@@ -308,6 +308,11 @@ export default function Profile() {
     setTimeout(() => setHeartAnimation(false), 2500);
   };
 
+  const handleCancelTeam = () => {
+    setEditingTeam(false);
+    setTeamInput(profile?.favoriteTeam || '');
+  };
+
   const cp = profile?.customPlayer || {};
   const skinTone    = SKIN_TONES.find(s => s.id === cp.skinTone)    || SKIN_TONES[1];
   const hairColor   = HAIR_COLORS.find(h => h.id === cp.hairColor)  || HAIR_COLORS[0];
@@ -496,7 +501,7 @@ export default function Profile() {
                 />
                 <div className="flex gap-2">
                   {editingTeam && (
-                    <button onClick={() => setEditingTeam(false)} className="flex-1 py-2.5 bg-muted text-foreground font-bold rounded-xl text-sm">Cancelar</button>
+                    <button onClick={handleCancelTeam} className="flex-1 py-2.5 bg-muted text-foreground font-bold rounded-xl text-sm">Cancelar</button>
                   )}
                   <button
                     onClick={handleSaveTeam}
