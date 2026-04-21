@@ -162,7 +162,7 @@ function PlayerEditor({ profile, onSave, onClose }) {
                   style={{ backgroundColor: s.color + '33' }}
                 >
                   <div className="w-10 h-10 rounded-full border-2 border-white shadow" style={{ backgroundColor: s.color }} />
-                  <span className="text-[10px] text-muted-foreground">{currentXP}/{XP_PER_LEVEL} XP</span>
+                  <span className="text-[10px] text-muted-foreground">{s.label}</span>
                   {skinTone.id === s.id && <Check className="w-3 h-3 text-primary" />}
                 </button>
               ))}
