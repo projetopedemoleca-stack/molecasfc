@@ -105,7 +105,8 @@ function ColorRow({ colors, value, onChange }) {
 // ─── Main Component ────────────────────────────────────────────
 export default function CharacterSelect() {
   const navigate = useNavigate();
-  const profile = loadProfile();
+  let profile = {};
+  try { profile = loadProfile() || {}; } catch { profile = {}; }
   const customPlayer = profile?.customPlayer;
   const hasCustomPlayer = customPlayer?.playerName;
 
