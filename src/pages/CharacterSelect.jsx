@@ -235,7 +235,20 @@ export default function CharacterSelect() {
                 className="bg-card rounded-3xl p-5 shadow-lg border border-border/30 max-w-sm mx-auto mb-5">
                 <div className="flex items-start gap-3 mb-3">
                   <div className="shrink-0 bg-gradient-to-b from-primary/10 to-accent/10 rounded-2xl p-1">
+                    {selectedId === 'custom' ? (
+                      <div className="overflow-hidden rounded-xl" style={{ width: 60, height: 72 }}>
+                        <CustomAvatar
+                          skin={skinObj} hairColor={hairObj} hairStyle={styleObj}
+                          uniformColor={customPlayer?.uniformColor || '#E91E63'}
+                          shortsColor={customPlayer?.shortsColor || '#212121'}
+                          bootsColor={customPlayer?.bootsColor || '#FFD600'}
+                          number={customPlayer?.jerseyNumber || 10}
+                          size={60}
+                        />
+                      </div>
+                    ) : (
                       <PlayerAvatar player={selected} uniformColor={shirtColor} shortsColor={shortsColor} bootsColor={bootsColor} size="md"/>
+                    )}
                   </div>
                   <div className="flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -246,11 +259,11 @@ export default function CharacterSelect() {
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground">{selected.position} · {selected.hair}</p>
+                      <p className="text-xs text-muted-foreground">{selectedId === 'custom' ? 'Jogadora Personalizada' : selected.position + ' · ' + selected.hair}</p>
                       <p className="text-xs text-foreground/80 italic mt-0.5">"{selected.trait}"</p>
                       {/* Level/XP info */}
                       {(() => {
-                        const lvlData = profile.playerLevels?.[selected.id];
+                        const lvlData = selectedId === 'custom' ? profile?.customPlayerLevel : profile.playerLevels?.[selected.id];
                         const lvlInfo = getLevelInfo(lvlData?.xp || 0);
                         return (
                           <div className="mt-1.5 flex items-center gap-2">
@@ -266,6 +279,19 @@ export default function CharacterSelect() {
                 </div>
 
                 {(() => {
+                  if (selectedId === 'custom') {
+                    const bonus = customPlayer?.skillBonus || 0;
+                    return (
+                      <div className="bg-primary/10 border border-primary/20 rounded-xl p-2.5 mb-2">
+                        <p className="text-xs font-bold text-primary flex items-center gap-1">
+                          <Sparkles className="w-3 h-3"/> ✨ Habilidade da Jogadora
+                        </p>
+                        <p className="text-xs text-foreground/80 mt-0.5">
+                          Bônus de {bonus}% em todas as ações por ser jogadora personalizada!
+                        </p>
+                      </div>
+                    );
+                  }
                   const ab = getAbility(selected.id);
                   return ab ? (
                     <div className="bg-primary/10 border border-primary/20 rounded-xl p-2.5 mb-2">
@@ -278,8 +304,8 @@ export default function CharacterSelect() {
                 })()}
 
                 <div className="bg-muted/60 rounded-xl px-2.5 py-1.5 mb-3 flex items-center gap-2">
-                  <span className="text-sm">{selected.favoriteAction === 'pass' ? '🎯' : selected.favoriteAction === 'dribble' ? '⚡' : '🔥'}</span>
-                  <p className="text-xs text-muted-foreground">Ação favorita: <span className="font-bold text-foreground">{selected.favoriteAction === 'pass' ? 'Passe' : selected.favoriteAction === 'dribble' ? 'Drible' : 'Chute'}</span></p>
+                  <span className="text-sm">{selectedId === 'custom' ? '⭐' : (selected.favoriteAction === 'pass' ? '🎯' : selected.favoriteAction === 'dribble' ? '⚡' : '🔥')}</span>
+                  <p className="text-xs text-muted-foreground">Ação favorita: <span className="font-bold text-foreground">{selectedId === 'custom' ? 'Personalizada' : (selected.favoriteAction === 'pass' ? 'Passe' : selected.favoriteAction === 'dribble' ? 'Drible' : 'Chute')}</span></p>
                 </div>
 
                 <div className="grid grid-cols-5 gap-1">
@@ -287,9 +313,9 @@ export default function CharacterSelect() {
                     <div key={key} className="text-center">
                       <span className="text-base block">{em}</span>
                       <div className="h-1 w-full bg-muted rounded-full mt-0.5">
-                        <div className="h-1 bg-primary rounded-full" style={{ width: `${selected.stats[key] * 20}%` }}/>
+                        <div className="h-1 bg-primary rounded-full" style={{ width: `${(selected.stats?.[key] || 0) * 20}%` }}/>
                       </div>
-                      <span className="text-[9px] text-muted-foreground">{selected.stats[key]}</span>
+                      <span className="text-[9px] text-muted-foreground">{selected.stats?.[key] || 0}</span>
                     </div>
                   ))}
                 </div>
