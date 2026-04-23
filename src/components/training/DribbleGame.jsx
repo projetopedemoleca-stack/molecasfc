@@ -1,29 +1,29 @@
-// Fut de Rua — simple and working
+// Fut de Rua — ball position separate, raccoon for ball, goal = ball enters goal area
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Volume2, VolumeX, RotateCcw } from 'lucide-react';
 
 const FW=360, FH=520, GW=110, GH=65;
-const PR=22, BR=22, BALLR=9, PS=4;
+const PR=22, BR=22, BALL_R=9, PS=4;
 const clamp=(v,m,M)=>Math.max(m,Math.min(M,v));
 const dist=(a,b)=>Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2);
 
 const BALLS=[
-  {id:'head',   name:'Cabeça de Boneca',  emoji:'🧠', spd:1.0},
-  {id:'can',    name:'Lata',              emoji:'🥫', spd:0.8},
-  {id:'stone',  name:'Pedra',             emoji:'🪨', spd:0.6},
-  {id:'paper',  name:'Papel Amassado',     emoji:'📄', spd:1.1},
-  {id:'bottle', name:'Garrafinha',         emoji:'🍶', spd:1.0},
-  {id:'lemon',  name:'Limão',             emoji:'🍋', spd:1.0},
-  {id:'cap',    name:'Tampinha',           emoji:'🪙', spd:1.05},
-  {id:'tennis',  name:'Bolinha de Tênis',  emoji:'🎾', spd:1.15},
-  {id:'deflated',name:'Bola Murcha',      emoji:'⚽', spd:0.7},
+  {id:'head',   name:'Cabeça de Boneca',  emoji:'🧠',spd:1.0},
+  {id:'can',    name:'Lata',              emoji:'🥫',spd:0.8},
+  {id:'stone',  name:'Pedra',             emoji:'🪨',spd:0.6},
+  {id:'paper',  name:'Papel Amassado',     emoji:'📄',spd:1.1},
+  {id:'bottle', name:'Garrafinha',         emoji:'🍶',spd:1.0},
+  {id:'lemon',  name:'Limão',             emoji:'🍋',spd:1.0},
+  {id:'cap',    name:'Tampinha',           emoji:'🪙',spd:1.05},
+  {id:'tennis',  name:'Bolinha de Tênis',  emoji:'🎾',spd:1.15},
+  {id:'deflated',name:'Bola Murcha',      emoji:'⚽',spd:0.7},
 ];
 const OBS=[
   {id:'dog',   name:'Cachorrinho', emoji:'🐕',beh:'patrolY',spd:1.5},
   {id:'car',   name:'Carro',       emoji:'🚗',beh:'static'},
   {id:'cat',   name:'Gato',        emoji:'🐱',beh:'patrolY',spd:0.9},
-  {id:'bike',  name:'Bicicleta',   emoji:'🚲',beh:'static'},
+  {id:'bike',  name:'Bicicleta',   emoji:'🚲',beh:'patrolX',spd:1.8},
   {id:'moto',  name:'Moto',        emoji:'🏍️',beh:'patrolX',spd:2.2},
   {id:'bin',   name:'Lixeira',     emoji:'🗑️',beh:'static'},
   {id:'granny',name:'Velhinha',   emoji:'👵',beh:'slow',spd:0.3},
@@ -43,12 +43,13 @@ export default function DribbleGame() {
   const [pg,setPg]       = useState(0);
   const [bg,setBg]       = useState(0);
   const [tl,setTl]       = useState(60);
-  const [own,setOwn]     = useState('player');
+  const [own,setOwn]     = useState('player'); // whose ball
   const [ballIdx,setBallIdx]=useState(0);
   const [selObs,setSelObs]=useState([]);
+  // Player, bot and BALL are separate
   const [pp,setPp]       = useState({x:FW/2,y:FH-100});
-  const [bp,setBp]       = useState({x:FW/2,y:FH-100});
-  const [botPos,setBotPos]=useState({x:FW/2,y:80});
+  const [botP,setBotP]   = useState({x:FW/2,y:80});
+  const [ballP,setBallP] = useState({x:FW/2,y:FH-100}); // ball position
   const [obp,setObp]     = useState([]);
   const [goEff,setGoEff] = useState(false);
   const [hitEff,setHitEff]=useState(false);
@@ -58,17 +59,15 @@ export default function DribbleGame() {
   const [snd,setSnd]     =useState(true);
   const [jv,setJv]       =useState({x:0,y:0});
 
-  // refs for game loop
-  const S = useRef({
+  const S=useRef({
     ph:'menu',lv:0,pg:0,bg:0,tl:60,own:'player',ballIdx:0,dizzy:false,
     jv:{x:0,y:0},aimAngle:-Math.PI/2,
-    pp:{x:FW/2,y:FH-100},bp:{x:FW/2,y:FH-100},bot:{x:FW/2,y:80},obp:[],
-    raf:null,tInt:null,
+    pp:{x:FW/2,y:FH-100},botP:{x:FW/2,y:80},ballP:{x:FW/2,y:FH-100},
+    obp:[],raf:null,tInt:null,
   });
   const joyRef=useRef(null);
   const jcRef=useRef(null);
 
-  // Sync state→ref
   useEffect(()=>{S.current.ph=ph;},[ph]);
   useEffect(()=>{S.current.lv=lv;},[lv]);
   useEffect(()=>{S.current.tl=tl;},[tl]);
@@ -80,16 +79,16 @@ export default function DribbleGame() {
   useEffect(()=>{S.current.ballIdx=ballIdx;},[ballIdx]);
   useEffect(()=>{S.current.aimAngle=aimAngle;},[aimAngle]);
   useEffect(()=>{S.current.pp=pp;},[pp]);
-  useEffect(()=>{S.current.bp=bp;},[bp]);
-  useEffect(()=>{S.current.bot=botPos;},[botPos]);
+  useEffect(()=>{S.current.botP=botP;},[botP]);
+  useEffect(()=>{S.current.ballP=ballP;},[ballP]);
   useEffect(()=>{S.current.obp=obp;},[obp]);
 
   const buildObs=(lvlIdx)=>{
     const cfg=LVLS[lvlIdx];
     const list=selObs.length>0?selObs:OBS.slice(0,cfg.obs);
     const o=list.map((o,i)=>({...o,
-      x:30+i*((FW-60)/Math.max(cfg.obs-1,1)),
-      y:FH/2+(i%2===0?-80:80),
+      x:FW/2 + (i%2===0?-(60+i*25):(60+i*25)),
+      y:FH/2 + (i%3===0?-90:i%3===1?0:90)*(0.5+i*0.15),
       dir:Math.random()>0.5?1:-1,
     }));
     S.current.obp=o; setObp(o); return o;
@@ -97,17 +96,18 @@ export default function DribbleGame() {
 
   const resetRound=()=>{
     const rp={x:FW/2,y:FH-100};
-    const rb={x:FW/2,y:80};
-    S.current.pp=rp; S.current.bp=rp; S.current.bot=rb;
-    S.current.own='player'; S.current.dizzy=false;
+    const bp2={x:FW/2,y:80};
+    const balP={x:FW/2,y:FH-100};
+    S.current.pp=rp; S.current.ballP=balP;
+    S.current.botP=bp2; S.current.own='player'; S.current.dizzy=false;
     S.current.aimAngle=-Math.PI/2;
-    setPp({...rp}); setBp({...rp}); setBotPos({...rb});
+    setPp({...rp}); setBotP({...bp2}); setBallP({...balP});
     setOwn('player'); setDizzy(false); setAimAngle(-Math.PI/2);
   };
 
   const startGame=(l)=>{
-    if(S.current.raf) cancelAnimationFrame(S.current.raf);
-    if(S.current.tInt) clearInterval(S.current.tInt);
+    if(S.current.raf)cancelAnimationFrame(S.current.raf);
+    if(S.current.tInt)clearInterval(S.current.tInt);
     S.current.ph='play'; setPh('play');
     S.current.lv=l; setLv(l);
     S.current.pg=0; S.current.bg=0; setPg(0); setBg(0);
@@ -124,7 +124,48 @@ export default function DribbleGame() {
     S.current.raf=requestAnimationFrame(loop);
   };
 
-  // Game loop
+  // Shoot: ball goes in direction, lands somewhere, both race to it
+  const doShoot=(who)=>{
+    // who = 'player' or 'bot' — the one SHOOTING
+    const angle=(who==='player')?aimAngle:Math.PI/2+((Math.random()-0.5)*0.8);
+    const power=70+Math.random()*40;
+    const vx=Math.cos(angle)*power/10;
+    const vy=Math.sin(angle)*power/10;
+    let pos={...S.current.ballP};
+    let frames=0;
+    const step=()=>{
+      frames++;
+      pos={x:pos.x+vx,y:pos.y+vy};
+      S.current.ballP=pos; setBallP({...pos});
+
+      // Wall bounce
+      if(pos.x<20||pos.x>FW-20){
+        pos={...pos,x:clamp(pos.x,20,FW-20)};
+      }
+
+      const done=frames>=22||pos.y<10||pos.y>FH-10||pos.x<10||pos.x>FW-10;
+
+      if(done){
+        // Ball stopped — whoever is closer gets it
+        const dP=dist(pos,S.current.pp);
+        const dB=dist(pos,S.current.botP);
+        if(dP<dB){
+          S.current.own='player'; setOwn('player');
+          S.current.pp=pos; setPp({...pos});
+        }else{
+          S.current.own='bot'; setOwn('bot');
+          S.current.botP=pos; setBotP({...pos});
+        }
+        S.current.raf=requestAnimationFrame(loop);
+        return;
+      }
+
+      S.current.raf=requestAnimationFrame(step);
+    };
+    if(S.current.raf)cancelAnimationFrame(S.current.raf);
+    S.current.raf=requestAnimationFrame(step);
+  };
+
   useEffect(()=>{
     if(ph!=='play') return;
     const loop=()=>{
@@ -133,44 +174,66 @@ export default function DribbleGame() {
       const spd=BALLS[S.current.ballIdx].spd;
       const jv=S.current.jv;
 
-      // Player move
+      // Player moves (if not dizzy)
       if(!S.current.dizzy){
         const np={
           x:clamp(S.current.pp.x+jv.x*PS*spd,PR,FW-PR),
           y:clamp(S.current.pp.y+jv.y*PS*spd,PR,FH-PR),
         };
         S.current.pp=np; setPp({...np});
-        if(S.current.own==='player'){S.current.bp={...np}; setBp({...np});}
       }
 
-      // Bot: always chase ball/player
-      const botTarget=S.current.own==='bot' ? {x:FW/2,y:FH-60} : {...S.current.pp};
-      const bDx=botTarget.x-S.current.bot.x;
-      const bDy=botTarget.y-S.current.bot.y;
+      // Bot always moves toward ball
+      const ballTarget=S.current.ballP;
+      const bDx=ballTarget.x-S.current.botP.x;
+      const bDy=ballTarget.y-S.current.botP.y;
       const bD=Math.sqrt(bDx*bDx+bDy*bDy)||1;
       const nb={
-        x:clamp(S.current.bot.x+(bDx/bD)*cfg.botSpd*spd,BR,FW-BR),
-        y:clamp(S.current.bot.y+(bDy/bD)*cfg.botSpd*spd,BR,FH-BR),
+        x:clamp(S.current.botP.x+(bDx/bD)*cfg.botSpd*spd,BR,FW-BR),
+        y:clamp(S.current.botP.y+(bDy/bD)*cfg.botSpd*spd,BR,FH-BR),
       };
-      S.current.bot=nb; setBotPos({...nb});
-      if(S.current.own==='bot'){S.current.bp={x:nb.x,y:nb.y+18}; setBp({x:nb.x,y:nb.y+18});}
+      S.current.botP=nb; setBotP({...nb});
 
-      // Move obs
+      // Ball follows owner
+      const ballPos=S.current.own==='player'?S.current.pp:S.current.botP;
+      if(!(S.current as any)._shooting){
+        S.current.ballP=ballPos; setBallP({...ballPos});
+      }
+
+      // Obstacles move
       const movedObs=S.current.obp.map(o=>{
-        if(o.beh==='patrolY'){const ny=o.y+o.dir*(o.spd||1.5);if(ny<35||ny>FH-35)return{...o,dir:-o.dir};return{...o,y:ny};}
+        if(o.beh==='patrolY'){const ny=o.y+o.dir*(o.spd||1.5);if(ny<30||ny>FH-30)return{...o,dir:-o.dir};return{...o,y:ny};}
         if(o.beh==='patrolX'){const nx=o.x+o.dir*(o.spd||1.5);if(nx<20||nx>FW-20)return{...o,dir:-o.dir};return{...o,x:nx};}
-        if(o.beh==='slow'){const ny=o.y+o.dir*(o.spd||0.3)*0.5;if(ny<35||ny>FH-35)return{...o,dir:-o.dir};return{...o,y:ny};}
-        if(o.beh==='bounce'){const ny=o.y-o.dir*(o.spd||1.2);if(ny<30||ny>FH-30)return{...o,dir:-o.dir};return{...o,y:ny};}
+        if(o.beh==='slow'){const ny=o.y+o.dir*(o.spd||0.3)*0.6;if(ny<30||ny>FH-30)return{...o,dir:-o.dir};return{...o,y:ny};}
+        if(o.beh==='bounce'){const ny=o.y-o.dir*(o.spd||1.2);if(ny<25||ny>FH-25)return{...o,dir:-o.dir};return{...o,y:ny};}
         return o;
       });
       S.current.obp=movedObs; setObp([...movedObs]);
 
-      // Player hits obs
+      // Player touches ball (if closer than bot)
+      if(S.current.own==='bot'){
+        const dP=dist(S.current.pp,S.current.ballP);
+        const dB=dist(S.current.botP,S.current.ballP);
+        if(dP<dB&&dP<20){
+          S.current.own='player'; setOwn('player');
+          setHitEff(true); setTimeout(()=>setHitEff(false),400);
+        }
+      }
+      // Bot touches ball (if closer than player)
+      if(S.current.own==='player'){
+        const dP=dist(S.current.pp,S.current.ballP);
+        const dB=dist(S.current.botP,S.current.ballP);
+        if(dB<dP&&dB<20){
+          S.current.own='bot'; setOwn('bot');
+          setHitEff(true); setTimeout(()=>setHitEff(false),400);
+        }
+      }
+
+      // Player hits obstacle → dizzy, keeps ball (ball stays where is)
       if(!S.current.dizzy&&S.current.own==='player'){
         for(const o of movedObs){
           if(dist(S.current.pp,{x:o.x,y:o.y})<PR+16){
             S.current.dizzy=true; setDizzy(true);
-            S.current.own='bot'; setOwn('bot');
             setHitEff(true);
             setTimeout(()=>{S.current.dizzy=false;setDizzy(false);},1400);
             setTimeout(()=>setHitEff(false),600);
@@ -179,40 +242,18 @@ export default function DribbleGame() {
         }
       }
 
-      // Bot hits obs
+      // Bot hits obstacle → drops ball, player can pick up
       for(const o of movedObs){
         if(dist(nb,{x:o.x,y:o.y})<BR+16&&S.current.own==='bot'){
           S.current.own='player'; setOwn('player');
+          S.current.ballP={...nb}; setBallP({...nb});
           setHitEff(true); setTimeout(()=>setHitEff(false),600);
           break;
         }
       }
 
-      // Body check
-      if(dist(S.current.pp,nb)<PR+BR-4){
-        if(S.current.own==='player'){S.current.own='bot';setOwn('bot');}
-        else{S.current.own='player';setOwn('player');}
-        setHitEff(true); setTimeout(()=>setHitEff(false),600);
-      }
-
-      // Bot GOAL (ball in player goal = top)
-      if(S.current.own==='bot'&&nb.y<GH+22&&Math.abs(nb.x-FW/2)<GW/2+5){
-        S.current.own='player'; setOwn('player');
-        S.current.bg++; setBg(g=>g+1);
-        setGoEff(true);
-        cancelAnimationFrame(S.current.raf);
-        setTimeout(()=>{
-          setGoEff(false);
-          if(S.current.bg>=LVLS[S.current.lv].goals){S.current.ph='end';setPh('end');setWinner('bot');}
-          else resetRound();
-          S.current.raf=requestAnimationFrame(loop);
-        },1200);
-        return;
-      }
-
-      // Player GOAL (ball in bot goal = bottom)
-      if(S.current.own==='player'&&S.current.pp.y>FH-GH-22&&Math.abs(S.current.pp.x-FW/2)<GW/2+5){
-        S.current.own='bot'; setOwn('bot');
+      // GOAL: player scores in BOTTOM goal
+      if(S.current.own==='player'&&S.current.pp.y>FH-GH-18&&Math.abs(S.current.pp.x-FW/2)<GW/2+2){
         S.current.pg++; setPg(g=>g+1);
         setGoEff(true);
         cancelAnimationFrame(S.current.raf);
@@ -225,13 +266,26 @@ export default function DribbleGame() {
         return;
       }
 
+      // GOAL: bot scores in TOP goal
+      if(S.current.own==='bot'&&nb.y<GH+18&&Math.abs(nb.x-FW/2)<GW/2+2){
+        S.current.bg++; setBg(g=>g+1);
+        setGoEff(true);
+        cancelAnimationFrame(S.current.raf);
+        setTimeout(()=>{
+          setGoEff(false);
+          if(S.current.bg>=LVLS[S.current.lv].goals){S.current.ph='end';setPh('end');setWinner('bot');}
+          else resetRound();
+          S.current.raf=requestAnimationFrame(loop);
+        },1200);
+        return;
+      }
+
       S.current.raf=requestAnimationFrame(loop);
     };
     S.current.raf=requestAnimationFrame(loop);
     return()=>{if(S.current.raf)cancelAnimationFrame(S.current.raf);};
   },[ph]);
 
-  // Joystick
   const joyStart=(cx,cy)=>{
     if(!joyRef.current) return;
     const r=joyRef.current.getBoundingClientRect();
@@ -245,19 +299,18 @@ export default function DribbleGame() {
     const a=Math.atan2(dy,dx);
     S.current.jv={x:Math.cos(a)*sc,y:Math.sin(a)*sc};
     S.current.aimAngle=a;
-    setJv({...S.current.jv});
-    setAimAngle(a);
+    setJv({...S.current.jv}); setAimAngle(a);
   };
   const joyEnd=()=>{jcRef.current=null;S.current.jv={x:0,y:0};setJv({x:0,y:0});};
 
   const shoot=()=>{
     if(S.current.own!=='player'||S.current.dizzy) return;
-    S.current.own='bot'; setOwn('bot');
-    setGoEff(true);
-    setTimeout(()=>setGoEff(false),600);
+    (S as any)._shooting=true;
+    setHitEff(true); setTimeout(()=>setHitEff(false),400);
+    doShoot('player');
+    setTimeout(()=>{(S as any)._shooting=false;},3000);
   };
 
-  // Menu
   if(ph==='menu'){
     return (
       <div className="flex flex-col items-center gap-5 py-4 px-4 min-h-[80vh]">
@@ -308,7 +361,6 @@ export default function DribbleGame() {
     );
   }
 
-  // End
   if(ph==='end'){
     const won=winner==='player';
     return (
@@ -327,9 +379,8 @@ export default function DribbleGame() {
     );
   }
 
-  // Game
-  const ax=bp.x+Math.cos(aimAngle)*50;
-  const ay=bp.y+Math.sin(aimAngle)*50;
+  const ax=ballP.x+Math.cos(aimAngle)*50;
+  const ay=ballP.y+Math.sin(aimAngle)*50;
 
   return (
     <div className="flex flex-col items-center gap-2 select-none">
@@ -353,7 +404,7 @@ export default function DribbleGame() {
           <circle cx={FW/2} cy={FH/2} r="35" stroke="white" strokeWidth="1.5" fill="none"/>
         </svg>
 
-        {/* Top goal (player defends) */}
+        {/* Top goal (bot scores here) */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2" style={{width:GW,height:GH}}>
           <div className="absolute inset-0 bg-white/10 rounded-b-xl border-4 border-white/60 border-t-0" style={{borderWidth:'0 4px 4px 4px'}}/>
           {[...Array(6)].map((_,i)=><div key={`vt${i}`} className="absolute top-0 bottom-0 w-px bg-white/20" style={{left:`${(i+1)*(100/7)}%`}}/>)}
@@ -363,7 +414,7 @@ export default function DribbleGame() {
           <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-2xl" style={{filter:'drop-shadow(0 2px 3px rgba(0,0,0,.5)'}}>🩴</div>
         </div>
 
-        {/* Bottom goal (bot defends) */}
+        {/* Bottom goal (player scores here) */}
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2" style={{width:GW,height:GH}}>
           <div className="absolute inset-0 bg-white/10 rounded-t-xl border-4 border-white/60 border-b-0" style={{borderWidth:'4px 4px 0 4px'}}/>
           {[...Array(6)].map((_,i)=><div key={`bv${i}`} className="absolute top-0 bottom-0 w-px bg-white/20" style={{left:`${(i+1)*(100/7)}%`}}/>)}
@@ -377,12 +428,12 @@ export default function DribbleGame() {
         {obp.map((o,i)=>(
           <motion.div key={i}
             animate={{
-              x:[o.x-18, o.x+18, o.x-18],
-              y: o.beh==='patrolY'||o.beh==='slow'||o.beh==='bounce' ? [o.y-18, o.y+18, o.y-18] : o.y,
+              x:o.beh==='patrolX'?[o.x-20,o.x+20,o.x-20]:o.x,
+              y:o.beh==='patrolY'||o.beh==='slow'||o.beh==='bounce'?[o.y-20,o.y+20,o.y-20]:o.y,
             }}
-            transition={{ duration:o.beh==='slow'?5:o.beh==='bounce'?2:3.5, repeat:Infinity, ease:'easeInOut' }}
+            transition={{duration:o.beh==='slow'?6:o.beh==='bounce'?2:3.5,repeat:Infinity,ease:'easeInOut'}}
             className="absolute text-3xl"
-            style={{left:o.x-16, top:o.y-16, filter:'drop-shadow(0 2px 4px rgba(0,0,0,.4)'}}>
+            style={{left:o.x-16,top:o.y-16,filter:'drop-shadow(0 2px 4px rgba(0,0,0,.4)'}}>
             {o.emoji}
           </motion.div>
         ))}
@@ -396,20 +447,21 @@ export default function DribbleGame() {
         </motion.div>
 
         {/* Bot */}
-        <motion.div animate={{x:botPos.x-BR,y:botPos.y-BR}}
+        <motion.div animate={{x:botP.x-BR,y:botP.y-BR}}
           className="absolute w-11 h-11 rounded-full bg-red-500 border-2 border-white shadow-lg flex items-center justify-center text-white font-black text-xs">
           🤖
         </motion.div>
 
-        {/* Ball */}
-        <motion.div animate={{x:bp.x-BALLR,y:bp.y-BALLR}} className="absolute">
+        {/* Ball (separate from characters) */}
+        <motion.div animate={{x:ballP.x-BALL_R,y:ballP.y-BALL_R}}
+          className="absolute">
           <div className="text-2xl drop-shadow-md">{BALLS[ballIdx].emoji}</div>
         </motion.div>
 
-        {/* Aim direction */}
+        {/* Aim direction (when player has ball) */}
         {own==='player'&&!dizzy&&(
           <svg width={FW} height={FH} className="absolute inset-0 pointer-events-none" style={{zIndex:5}}>
-            <line x1={bp.x} y1={bp.y} x2={ax} y2={ay} stroke="#FFD600" strokeWidth="2.5" strokeDasharray="6 4" opacity="0.85"/>
+            <line x1={ballP.x} y1={ballP.y} x2={ax} y2={ay} stroke="#FFD600" strokeWidth="2.5" strokeDasharray="6 4" opacity="0.85"/>
             <polygon
               points={`${ax},${ay} ${ax+Math.cos(aimAngle+2.5)*11},${ay+Math.sin(aimAngle+2.5)*11} ${ax+Math.cos(aimAngle-2.5)*11},${ay+Math.sin(aimAngle-2.5)*11}`}
               fill="#FFD600" opacity="0.9"/>
@@ -426,7 +478,7 @@ export default function DribbleGame() {
           )}
         </AnimatePresence>
 
-        {/* Goal effect */}
+        {/* Goal */}
         <AnimatePresence>
           {goEff&&(
             <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
@@ -450,7 +502,7 @@ export default function DribbleGame() {
 
       {/* Possession */}
       <div className={`px-4 py-1.5 rounded-full text-xs font-bold ${own==='player'?'bg-blue-100 text-blue-600':'bg-red-100 text-red-600'}`}>
-        {own==='player'?(dizzy?'💫 Tonto — perdeu!':'⚽ Você tem a bola'):'🤖 Bot tem a bola'}
+        {own==='player'?(dizzy?'💫 Tonto — perdeu a posse!':'⚽ Bola com você'):'🤖 Bola com o bot'}
       </div>
 
       {/* Controls */}
