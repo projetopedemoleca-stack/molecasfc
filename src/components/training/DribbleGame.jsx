@@ -20,14 +20,14 @@ const BALLS=[
   {id:'deflated',name:'Bola Murcha',      emoji:'⚽', spd:0.7},
 ];
 const OBS=[
-  {id:'dog',   name:'Cachorrinho', emoji:'🐕',beh:'patrol',spd:1.5},
+  {id:'dog',   name:'Cachorrinho', emoji:'🐕',beh:'patrolY',spd:1.5},
   {id:'car',   name:'Carro',       emoji:'🚗',beh:'static'},
-  {id:'cat',   name:'Gato',        emoji:'🐱',beh:'patrol',spd:1.0},
+  {id:'cat',   name:'Gato',        emoji:'🐱',beh:'patrolY',spd:0.9},
   {id:'bike',  name:'Bicicleta',   emoji:'🚲',beh:'static'},
-  {id:'moto',  name:'Moto',        emoji:'🏍️',beh:'static'},
+  {id:'moto',  name:'Moto',        emoji:'🏍️',beh:'patrolX',spd:2.2},
   {id:'bin',   name:'Lixeira',     emoji:'🗑️',beh:'static'},
   {id:'granny',name:'Velhinha',   emoji:'👵',beh:'slow',spd:0.3},
-  {id:'speaker',name:'Caixinha',   emoji:'📻',beh:'static'},
+  {id:'speaker',name:'Caixinha',   emoji:'📻',beh:'bounce',spd:1.2},
 ];
 const LVLS=[
   {label:'Nível 1',goals:3,t:60,botSpd:1.0,obs:2},
@@ -89,8 +89,8 @@ export default function DribbleGame() {
     const list=selObs.length>0?selObs:OBS.slice(0,cfg.obs);
     const o=list.map((o,i)=>({...o,
       x:30+i*((FW-60)/Math.max(cfg.obs-1,1)),
-      y:FH/2+(i%2===0?-85:85),
-      dir:i%2===0?1:-1,
+      y:FH/2+(i%2===0?-80:80),
+      dir:Math.random()>0.5?1:-1,
     }));
     S.current.obp=o; setObp(o); return o;
   };
@@ -157,8 +157,10 @@ export default function DribbleGame() {
 
       // Move obs
       const movedObs=S.current.obp.map(o=>{
-        if(o.beh==='patrol'){const nx=o.x+o.dir*(o.spd||1.5);if(nx<20||nx>FW-20)return{...o,dir:-o.dir};return{...o,x:nx};}
-        if(o.beh==='slow'){const nx=o.x+o.dir*(o.spd||0.3)*0.4;if(nx<20||nx>FW-20)return{...o,dir:-o.dir};return{...o,x:nx};}
+        if(o.beh==='patrolY'){const ny=o.y+o.dir*(o.spd||1.5);if(ny<35||ny>FH-35)return{...o,dir:-o.dir};return{...o,y:ny};}
+        if(o.beh==='patrolX'){const nx=o.x+o.dir*(o.spd||1.5);if(nx<20||nx>FW-20)return{...o,dir:-o.dir};return{...o,x:nx};}
+        if(o.beh==='slow'){const ny=o.y+o.dir*(o.spd||0.3)*0.5;if(ny<35||ny>FH-35)return{...o,dir:-o.dir};return{...o,y:ny};}
+        if(o.beh==='bounce'){const ny=o.y-o.dir*(o.spd||1.2);if(ny<30||ny>FH-30)return{...o,dir:-o.dir};return{...o,y:ny};}
         return o;
       });
       S.current.obp=movedObs; setObp([...movedObs]);
@@ -374,9 +376,13 @@ export default function DribbleGame() {
         {/* Obstacles */}
         {obp.map((o,i)=>(
           <motion.div key={i}
-            animate={o.beh==='patrol'||o.beh==='slow'?{x:[o.x-25,o.x+25,o.x-25]}:{}}
-            transition={{duration:o.beh==='slow'?7:3.5,repeat:Infinity,ease:'easeInOut'}}
-            className="absolute text-3xl" style={{left:o.x-16,top:o.y-16,filter:'drop-shadow(0 2px 4px rgba(0,0,0,.4)'}}>
+            animate={{
+              x:[o.x-18, o.x+18, o.x-18],
+              y: o.beh==='patrolY'||o.beh==='slow'||o.beh==='bounce' ? [o.y-18, o.y+18, o.y-18] : o.y,
+            }}
+            transition={{ duration:o.beh==='slow'?5:o.beh==='bounce'?2:3.5, repeat:Infinity, ease:'easeInOut' }}
+            className="absolute text-3xl"
+            style={{left:o.x-16, top:o.y-16, filter:'drop-shadow(0 2px 4px rgba(0,0,0,.4)'}}>
             {o.emoji}
           </motion.div>
         ))}
